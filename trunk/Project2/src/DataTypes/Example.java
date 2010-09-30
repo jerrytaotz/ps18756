@@ -109,7 +109,7 @@ public class Example {
 		hostA.sendPacket("10.0.0.2", 50);
 		hostA.sendPacket("10.0.0.3", 50);
 		hostB.sendPacket("10.0.0.1", 20);
-		for(int i=0; i<70; i++)
+		for(int i=0; i<130; i++)
 			router.tock();
 		
 		/*
