@@ -11,7 +11,7 @@ public class IPRouter implements IPConsumer{
 	private int time = 0,currNIC = 0;
 	private Boolean fifo=true, rr=false, wrr=false, wfq=false, routeEntirePacket=true;
 	private HashMap<IPNIC, FIFOQueue> inputQueues = new HashMap<IPNIC, FIFOQueue>();
-	private int lastNicServiced=-1, weightFulfilled=1;
+	private int lastNicServiced=-1, weightFulfilled=0;
 	// remembering the queue rather than the interface number is useful for wfq
 	private FIFOQueue lastServicedQueue = null;
 	private FIFOQueue centralFIFOQueue = null;
@@ -106,11 +106,36 @@ public class IPRouter implements IPConsumer{
 	private void rr(){
 		if(nics.size() > 0)
 		{
-			if(this.routeEntirePacket == false){
+			if(this.routeEntirePacket == false)
 				bbrr(); //perform bit by bit round robin
+			else{
+				packetRoundRobin();
 			}
-
 		}	
+	}
+	
+	/**
+	 * perform packetwise round robin
+	 */
+	private void packetRoundRobin(){
+		IPPacket readyPacket = null;
+		if(lastServicedQueue == null){
+			lastServicedQueue = findNextServiceableQueue();
+		}
+		//check if we actually found a queue with something to send
+		if(lastServicedQueue != null){
+			//route the next bit in the current packet
+			lastServicedQueue.routeBit();
+			//see if the current packet is ready
+			readyPacket = lastServicedQueue.ready();
+			if(readyPacket != null){
+				 this.forwardPacket(readyPacket);
+				//move on to the next queue
+				 this.currNIC = (currNIC + 1) % nics.size();
+				 lastServicedQueue = findNextServiceableQueue();
+			}
+		}
+		//if no queue had any packets, silently exit
 	}
 	
 	/**
@@ -150,7 +175,36 @@ public class IPRouter implements IPConsumer{
 	 * Perform weighted round robin on the queue
 	 */
 	private void wrr(){
-
+		if(this.routeEntirePacket == false){
+			this.bwrr();
+		}
+	}
+	
+	/**
+	 * perform bitwise weighted round robin
+	 */
+	private void bwrr(){
+		IPPacket readyPacket = null;
+		
+		if(this.lastServicedQueue == null){
+			lastServicedQueue = this.findNextServiceableQueue();
+		}
+		//make sure we actually found a queue with a packet to send
+		if(this.lastServicedQueue != null){
+			lastServicedQueue.routeBit();
+			this.weightFulfilled++;
+			readyPacket = lastServicedQueue.ready();
+			if(readyPacket != null){
+				this.forwardPacket(readyPacket);
+			}
+			//Check if we the weight obligation for this queue is fulfilled.
+			if(this.weightFulfilled == lastServicedQueue.getWeight()){
+				this.weightFulfilled = 0;
+				//update the active queue.
+				currNIC = (currNIC + 1) % nics.size();
+				lastServicedQueue = this.findNextServiceableQueue();
+			}
+		}
 	}
 	
 	/**
@@ -211,6 +265,27 @@ public class IPRouter implements IPConsumer{
 	}
 	
 	/**
+	 * Finds the next queue which has something to transmit.
+	 * @return the next queue which has a packet in it, if there is one. null otherwise
+	 */
+	private FIFOQueue findNextServiceableQueue(){
+		FIFOQueue nextQueue = null;
+		IPNIC nextNIC = null;
+		
+		//get the next occupied queue and skip over the others
+		for(int i = 0; i < nics.size(); i++ ){
+			//Get the next NIC which has a packet to route.
+			nextNIC = nics.get(currNIC);
+			nextQueue = inputQueues.get(nextNIC);
+			//if we have a non empty queue we can route the bit and break out
+			if(nextQueue.peek() != null){
+				return nextQueue;
+			}
+			else currNIC = (currNIC + 1) % nics.size();
+		}
+		return nextQueue;
+	}
+	/**
 	 * set the router to use FIFO service
 	 */
 	public void setIsFIFO(){
@@ -252,7 +327,12 @@ public class IPRouter implements IPConsumer{
 		this.wfq = false;
 		
 		// Setup router for Weighted Round Robin under here
-		
+		//set up an input queue on each NIC
+		for(Iterator<IPNIC> it = nics.iterator();it.hasNext();)
+		{
+			//Add a new queue to the NIC
+			inputQueues.put(it.next(), new FIFOQueue());
+		}	
 	}
 	
 	/**
