@@ -5,6 +5,13 @@ import NetworkElements.Cat5e;
 import NetworkElements.IPRouter;
 import NetworkElements.IPNIC;
 
+/**
+ * This is the setup code for project 2.  Sets up a small network with a few
+ * computers and a single router.  The purpose of the project is to swap out 
+ * different packet scheduling disciplines at the router and compare their 
+ * performances.
+ * @author Prof. Hyong Kim, modified by Brady Tello (btello@andrew.cmu.edu)
+ */
 public class Example {
 	public Example(){}
 	
