@@ -10,6 +10,7 @@ public class IPRouter implements IPConsumer{
 	private HashMap<Inet4Address, IPNIC> forwardingTable = new HashMap<Inet4Address, IPNIC>();
 	private int time = 0,currNIC = 0;
 	private Boolean fifo=true, rr=false, wrr=false, wfq=false, routeEntirePacket=true;
+	private Boolean fulfillingPacket = false, packetFulfilled = false;
 	private HashMap<IPNIC, FIFOQueue> inputQueues = new HashMap<IPNIC, FIFOQueue>();
 	private int lastNicServiced=-1, weightFulfilled=0;
 	// remembering the queue rather than the interface number is useful for wfq
@@ -178,6 +179,7 @@ public class IPRouter implements IPConsumer{
 		if(this.routeEntirePacket == false){
 			this.bwrr();
 		}
+		else this.pwrr();
 	}
 	
 	/**
@@ -203,6 +205,41 @@ public class IPRouter implements IPConsumer{
 				//update the active queue.
 				currNIC = (currNIC + 1) % nics.size();
 				lastServicedQueue = this.findNextServiceableQueue();
+			}
+		}
+	}
+	
+	/**
+	 * Perform packetwise weighted round robin
+	 */
+	private void pwrr(){
+		IPPacket readyPacket = null;
+		
+		if(this.lastServicedQueue == null){
+			lastServicedQueue = this.findNextServiceableQueue();
+		}
+		//make sure we actually found a queue with a packet to send
+		if(this.lastServicedQueue != null){
+			lastServicedQueue.routeBit();
+			//increment the weight fulfilled if we are still working on bitwise obligation.
+			if(!this.fulfillingPacket) this.weightFulfilled++;
+			readyPacket = lastServicedQueue.ready();
+			if(readyPacket != null){
+				this.forwardPacket(readyPacket);
+				this.packetFulfilled = true;
+			}
+			else this.packetFulfilled = false;
+			//Check if we the weight obligation for this queue is fulfilled.
+			if(this.weightFulfilled == lastServicedQueue.getWeight()){
+				//if we have completed a packet this round, move on to the next queue
+				if(this.packetFulfilled){
+					this.weightFulfilled = 0;
+					this.fulfillingPacket = false;
+					//update the active queue.
+					currNIC = (currNIC + 1) % nics.size();
+					lastServicedQueue = this.findNextServiceableQueue();
+				}
+				else this.fulfillingPacket = true;
 			}
 		}
 	}
