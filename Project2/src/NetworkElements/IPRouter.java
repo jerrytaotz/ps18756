@@ -9,14 +9,13 @@ public class IPRouter implements IPConsumer{
 	private ArrayList<IPNIC> nics = new ArrayList<IPNIC>();
 	private HashMap<Inet4Address, IPNIC> forwardingTable = new HashMap<Inet4Address, IPNIC>();
 	private HashMap<IPNIC, FIFOQueue> inputQueues = new HashMap<IPNIC, FIFOQueue>();
-	private double virtualTime = 0.0,minFin = 0.0;
+	private double virtualTime = 0.0;
 	private int time = 0,currNIC = 0;
 	private int lastNicServiced=-1, weightFulfilled=0;
 	private Boolean fifo=true, rr=false, wrr=false, wfq=false, routeEntirePacket=true;
 	private Boolean fulfillingPacket = false, packetFulfilled = false;
 	// remembering the queue rather than the interface number is useful for wfq
 	private FIFOQueue lastServicedQueue = null;
-	private FIFOQueue minQueue = null;
 	private FIFOQueue centralFIFOQueue = null;
 
 	/**
@@ -62,13 +61,9 @@ public class IPRouter implements IPConsumer{
 			packet.setFinishTime(
 					(double)packet.getSize()/(double)q.getWeight()
 					+ Math.max(virtualTime, lastFinishTime));
-			//set the lowest finish time
-			if(packet.getFinishTime() < minFin || minFin == 0.0){
-				minFin = packet.getFinishTime();
-				this.minQueue = q;
-			}
 		}
 	}
+	
 	
 	public void forwardPacket(IPPacket packet){
 		forwardingTable.get(packet.getDest()).sendIPPacket(packet);
@@ -262,11 +257,20 @@ public class IPRouter implements IPConsumer{
 	 * Perform weighted fair queuing on the queue
 	 */
 	private void wfq(){
-		IPPacket readyPacket = null;
+		IPPacket readyPacket = null,headPacket = null;
+		double minFin = Double.MAX_VALUE;
 		
 		if(!fulfillingPacket){
-			//pick the queue with the packet with the lowest finish time.
-			lastServicedQueue = minQueue;
+			//pick the queue containing the packet with the lowest finish time.
+			for(FIFOQueue q:inputQueues.values()){
+				headPacket = q.peek();
+				if(headPacket != null){
+					if(headPacket.getFinishTime() < minFin){
+						minFin = headPacket.getFinishTime();
+						this.lastServicedQueue = q;
+					}
+				}
+			}//for
 			fulfillingPacket = true;
 		}
 		//send a bit
@@ -425,7 +429,6 @@ public class IPRouter implements IPConsumer{
 		this.wfq = true;
 		
 		// Setup router for Weighted Fair Queuing under here
-		this.minQueue = new FIFOQueue();
 		//set up an input queue on each NIC
 		for(Iterator<IPNIC> it = nics.iterator();it.hasNext();)
 		{
