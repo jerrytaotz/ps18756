@@ -99,6 +99,7 @@ public class IPPacket {
 	 * @param finishTime the expected finish time of this packet
 	 */
 	public void setFinishTime(double finishTime){
+		System.out.println("Finish Time: " + finishTime);
 		this.finishTime = finishTime;
 	}
 	

@@ -161,7 +161,7 @@ public class Example {
 			(Computer): Received a packet 10.0.0.3 > 10.0.0.4 took 35 time
 
 		 */
-		/*router.setIsWeightedFairQueuing();
+		router.setIsWeightedFairQueuing();
 		router.setQueueWeight(routerNICA, 6);
 		router.setQueueWeight(routerNICB, 2);
 		hostA.sendPacket("10.0.0.2", 50);
@@ -183,7 +183,7 @@ public class Example {
 		hostC.sendPacket("10.0.0.4", 4);
 		hostC.sendPacket("10.0.0.4", 1);
 		for(int i=0; i<50; i++)
-			router.tock();*/
+			router.tock();
 	}
 	
 	public static void main(String args[]){
