@@ -5,6 +5,12 @@ import java.awt.image.LookupTable;
 import java.net.*;
 import DataTypes.*;
 
+/**
+ * The IPRouter class is the abstraction of a physical IP router.
+ * It maintains an input queue for each of its interfaces and has the capability
+ * to be configured to use several different queuing algorithms.
+ * @author Prof. Hyong Kim, modified by Brady Tello
+ */
 public class IPRouter implements IPConsumer{
 	private ArrayList<IPNIC> nics = new ArrayList<IPNIC>();
 	private HashMap<Inet4Address, IPNIC> forwardingTable = new HashMap<Inet4Address, IPNIC>();
@@ -40,16 +46,18 @@ public class IPRouter implements IPConsumer{
 	 * @param nic the nic the packet was received on
 	 */
 	public void receivePacket(IPPacket packet, IPNIC nic){
-		FIFOQueue q = inputQueues.get(nic);
+		FIFOQueue q; 
 		
-		//Place the packet in it's input queue.
-		q.offer(packet);
-		
-		//If we are using FIFO, move the packets to the central queue.
+		//If we are using FIFO, move the packets to the central queue and return.
 		if(this.fifo){
 			this.centralFIFOQueue.offer(packet);
+			return;
 		}
 		
+		q = inputQueues.get(nic);
+		//Place the packet in it's input queue.
+		q.offer(packet);
+
 		// If wfq set the expected finish time
 		if(this.wfq){
 			//Let's see if there are any packets ahead of this guy in the queue.
@@ -64,11 +72,20 @@ public class IPRouter implements IPConsumer{
 		}
 	}
 	
-	
+	/**
+	 * Forwards a packet on the interface mapped by its destination address
+	 * @param packet the packet to be forwarded
+	 */
 	public void forwardPacket(IPPacket packet){
 		forwardingTable.get(packet.getDest()).sendIPPacket(packet);
 	}
 	
+	/**
+	 * Route a single bit from a queue.  This method will behave differently
+	 * depending on which of the various queueing disciplines has been selected.
+	 * The various bit routing methods routeBit() can use are fifo() rr() wrr() 
+	 * and wfq() 
+	 */
 	public void routeBit(){
 		/*
 		 *  FIFO scheduler
@@ -101,7 +118,6 @@ public class IPRouter implements IPConsumer{
 		IPPacket readyPacket;
 		this.centralFIFOQueue.tock();
 		//route a single bit from the central queue
-		
 		this.centralFIFOQueue.routeBit();
 		//check if the queue has any ready packets.
 		readyPacket = centralFIFOQueue.ready();
@@ -125,7 +141,7 @@ public class IPRouter implements IPConsumer{
 	}
 	
 	/**
-	 * perform packetwise round robin
+	 * Perform packetwise round robin
 	 */
 	private void packetRoundRobin(){
 		IPPacket readyPacket = null;
@@ -149,7 +165,7 @@ public class IPRouter implements IPConsumer{
 	}
 	
 	/**
-	 * do bit by bit round robin
+	 * Do bit by bit round robin queuing
 	 */
 	private void bbrr(){
 		FIFOQueue nextQueue = null;
@@ -182,7 +198,9 @@ public class IPRouter implements IPConsumer{
 	}
 	
 	/**
-	 * Perform weighted round robin on the queue
+	 * Perform weighted round robin on the queue.  This function is used as a wrapper
+	 * for either the bitwise or the packetwise versions of the weighted round robin 
+	 * queuing methods.
 	 */
 	private void wrr(){
 		if(this.routeEntirePacket == false){
@@ -258,8 +276,10 @@ public class IPRouter implements IPConsumer{
 	 */
 	private void wfq(){
 		IPPacket readyPacket = null,headPacket = null;
+		//Will be used to determine which queue gets to go next
 		double minFin = Double.MAX_VALUE;
 		
+		//If the router is not currently in the middle of another packet
 		if(!fulfillingPacket){
 			//pick the queue containing the packet with the lowest finish time.
 			for(FIFOQueue q:inputQueues.values()){
@@ -270,19 +290,20 @@ public class IPRouter implements IPConsumer{
 						this.lastServicedQueue = q;
 					}
 				}
-			}//for
+			}
+			//Tell the router it is busy with a packet again.
 			fulfillingPacket = true;
 		}
 		//send a bit
 		lastServicedQueue.routeBit();
 		//check for a ready packet
 		readyPacket = lastServicedQueue.ready();
+		//If there was a packet ready for routing then send it
 		if(readyPacket != null){
 			forwardPacket(readyPacket);
+			//tell the router it can pick the next available queue
 			fulfillingPacket = false;
 		}
-		//and update the virtual time.
-		virtualTime += (double)time/sumOfWeights() - virtualTime;
 	}
 	
 	/**
@@ -341,7 +362,9 @@ public class IPRouter implements IPConsumer{
 		
 		// calculate the new virtual time for the next round
 		if(this.wfq){
-			
+			//and update the virtual time.
+			//(NOTE: line speed is 1 bit per clock cycle)
+			virtualTime += 1/sumOfWeights();
 		}
 		
 		// route bit for this round

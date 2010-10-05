@@ -15,6 +15,9 @@ import NetworkElements.IPNIC;
 public class Example {
 	public Example(){}
 	
+	/**
+	 * 
+	 */
 	public void go(){
 		// Create some computers with NICs
 		Computer hostA = new Computer();
@@ -176,7 +179,7 @@ public class Example {
 		hostC.sendPacket("10.0.0.4", 1);
 		router.tock();
 		router.tock();
-		router.tock();
+		router.tock(); // this will start sending one of 30 / 20
 		hostC.sendPacket("10.0.0.4", 1);
 		for(int i=0; i<20; i++)
 			router.tock();
