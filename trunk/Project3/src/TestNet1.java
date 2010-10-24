@@ -5,55 +5,30 @@ import NetworkElements.*;
 
 
 /**
- * A Junit testing class which should make testing a little easier.
- * @author Brady
+ * A Junit testing class which sets up the sample network from the project 
+ * writeup and runs some tests against it.
+ * @author Brady Tello
  */
 public class TestNet1 {
 
 	// This object will be used to move time forward on all objects
 	private ArrayList<IATMCellConsumer> allConsumers;// = new ArrayList<IATMCellConsumer>();
 	private int time;
+	ATMRouter r1,r2,r3,r4,r5;
+	Computer comp1,comp2;
 	
 	/*The setup method.  Just zeros everything out for now.*/
 	@Before
 	public void setUp() throws Exception {
 		time = 0;
 		allConsumers = new ArrayList<IATMCellConsumer>();
-	}
-
-	/*the teardown method*/
-	@After
-	public void tearDown() throws Exception {
-	}
-
-	/**
-	 * moves time forward in all of the networks objects, so that cells take some amount of time to
-	 * travel from once place to another
-	 * @since 1.0
-	 */
-	public void tock(){
-		System.out.println("** TIME = " + time + " **");
-		time++;
-		
-		// Move the cells in the output buffers
-		for(int i=0; i<this.allConsumers.size(); i++)
-			allConsumers.get(i).clearOutputBuffers();
-		
-		// Move the cells from the input buffers to the output buffers
-		for(int i=0; i<this.allConsumers.size(); i++)
-			allConsumers.get(i).clearInputBuffers();
-	}
-	
-	@Test
-	public void testNet1(){
-		System.out.println("**Test 1 SYSTEM SETUP **");
 		
 		// Create some new ATM Routers
-		ATMRouter r1 = new ATMRouter(9);
-		ATMRouter r2 = new ATMRouter(3);
-		ATMRouter r3 = new ATMRouter(11);
-		ATMRouter r4 = new ATMRouter(13);
-		ATMRouter r5 = new ATMRouter(14);
+		r1 = new ATMRouter(9);
+		r2 = new ATMRouter(3);
+		r3 = new ATMRouter(11);
+		r4 = new ATMRouter(13);
+		r5 = new ATMRouter(14);
 		
 		// give the routers interfaces
 		ATMNIC r1n1 = new ATMNIC(r1);
@@ -104,13 +79,13 @@ public class TestNet1 {
 		r5.addNextHopInterface(12, r5n1);
 		
 		// Connect a computer to r1
-		Computer comp1 = new Computer("1");
+		comp1 = new Computer("1");
 		ATMNIC comp1n1 = new ATMNIC(comp1);
 		ATMNIC r1n101 = new ATMNIC(r1);
 		OtoOLink l101 = new OtoOLink(comp1n1, r1n101);
 		
 		// Connect a computer to r2
-		Computer comp2 = new Computer("2");
+		comp2 = new Computer("2");
 		ATMNIC comp2n1 = new ATMNIC(comp2);
 		ATMNIC r2n101 = new ATMNIC(r2);
 		OtoOLink l201 = new OtoOLink(comp2n1, r2n101);
@@ -127,7 +102,35 @@ public class TestNet1 {
 		// set the drop mechanism if we want to try them
 		for(int i=0; i<this.allConsumers.size(); i++)
 			this.allConsumers.get(i).useTailDrop();
+	}
+
+	/*the teardown method*/
+	@After
+	public void tearDown() throws Exception {
+	}
+
+	/**
+	 * moves time forward in all of the networks objects, so that cells take some amount of time to
+	 * travel from once place to another
+	 * @since 1.0
+	 */
+	public void tock(){
+		System.out.println("** TIME = " + time + " **");
+		time++;
 		
+		// Move the cells in the output buffers
+		for(int i=0; i<this.allConsumers.size(); i++)
+			allConsumers.get(i).clearOutputBuffers();
+		
+		// Move the cells from the input buffers to the output buffers
+		for(int i=0; i<this.allConsumers.size(); i++)
+			allConsumers.get(i).clearInputBuffers();
+	}
+	
+	@Test
+	public void testNet1Test1(){
+		System.out.println("**Test 1 SYSTEM SETUP **");
+
 		// Setup a connection from comp1 to router 13 and comp2 to 14
 		tock();
 		//comp1.sendPacket(500);
