@@ -166,7 +166,7 @@ public class ATMRouter implements IATMCellConsumer{
 	}
 	
 	/**
-	 * 
+	 * TODO fill in the comments for this method
 	 * @param cell
 	 * @param nic
 	 */
@@ -174,6 +174,7 @@ public class ATMRouter implements IATMCellConsumer{
 		String cellData = cell.getData();
 		int proposedVC = getIntFromEndOfString(cellData);
 		NICVCPair nicVCPair = new NICVCPair(nic, proposedVC);
+		int nextInVC;
 		
 		receivedConnect(cell);
 		
@@ -182,13 +183,17 @@ public class ATMRouter implements IATMCellConsumer{
 			//need to come up with a new output VC
 			nicVCPair = new NICVCPair(nic,calcOutVC(nic));		
 		}
-		VCtoVC.put(calcInVC(), nicVCPair);
+		nextInVC = calcInVC();
+		VCtoVC.put(nextInVC, nicVCPair);
+		
+		//print a message indicating choice of VC->VC mapping
+		labelsSelected(nextInVC,VCtoVC.get(nextInVC));
 		
 		//send a connect ack message
 		sendSignal(nic,"connect ack",cell);
 		
 		//forward the connect to the next router/computer
-		sendSignal(currentConnAttemptNIC,"connect " + calcInVC(),cell);
+		sendSignal(currentConnAttemptNIC,"connect " + nextInVC,cell);
 		
 		//currentConnAttemptNIC being null indicates this router is free to process
 		//setup messages again.
@@ -485,9 +490,12 @@ public class ATMRouter implements IATMCellConsumer{
 	 * @since 1.0
 	 */
 	private void receivedConnect(ATMCell cell){
+int VCNum = getIntFromEndOfString(cell.getData());
+		
+		//TODO remove the VC in parens below before submission.
 		if(this.displayCommands)
 		System.out.println("REC CONN: Router " +this.address+ 
-				" received a connect message " + cell.getTraceID());
+				" received a connect message " + "(" + VCNum + ") " + cell.getTraceID());
 	}
 	
 	/**
@@ -579,5 +587,18 @@ public class ATMRouter implements IATMCellConsumer{
 		if(this.displayCommands)
 		System.out.println("REC WAIT: Router " +this.address+ " received a wait message " 
 				+ cell.getTraceID());
+	}
+	
+	/**
+	 * Prints a message to the console indicating which input/output VCs were selected for
+	 * for a connection
+	 * @param inVC - the input VC for the connection
+	 * @param outPair - the output NIC/VC pair for the connection
+	 * @remarks the pair should be established before a call to this method
+	 */
+	private void labelsSelected(int inVC, NICVCPair outPair){
+		if(this.displayCommands)
+			System.out.println("Label mapping (Router " + this.address + "): <" +
+					inVC + "," + outPair.getVC() + ">");
 	}
 }
