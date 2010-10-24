@@ -129,7 +129,7 @@ public class TestNet1 {
 	
 	@Test
 	public void testNet1Test1(){
-		System.out.println("**Test 1 SYSTEM SETUP **");
+		System.out.println("**TestNet1 Test 1**");
 
 		// Setup a connection from comp1 to router 13 and comp2 to 14
 		tock();
@@ -143,4 +143,29 @@ public class TestNet1 {
 			//this.tock();
 		Assert.assertTrue(true);
 	}
+	
+	/**
+	 * Similar to test 1 but tears down the VCs after they are set up.
+	 */
+	@Test
+	public void testNet1Test2(){
+		System.out.println("**TestNet1 Test 2**");
+
+		// Setup a connection from comp1 to router 13 and comp2 to 14
+		tock();
+		//comp1.sendPacket(500);
+		comp1.setupConnection(13);
+		comp2.setupConnection(14);
+		for(int i=0; i<12; i++)
+			this.tock();
+		comp1.endConnection();
+		comp2.endConnection();
+		for(int i=0;i<10;i++)
+			tock();
+		//comp1.sendPacket(500);
+		//for(int i=0; i<8; i++)
+			//this.tock();
+		Assert.assertTrue(true);
+	}
+	
 }
