@@ -45,9 +45,12 @@ public class ATMRouter implements IATMCellConsumer{
 	 * @param signal - a string representation of the signal to be sent.
 	 * valid values for signal:
 	 * "call proceeding"
-	 * "setup"
+	 * "setup <dest. address>"
 	 * "wait"
-	 * "connect"
+	 * "connect <vc number>"
+	 * "connect ack"
+	 * "end <vc number>"
+	 * "end ack"
 	 * @param oldCell - the cell which this signal is being sent in response to
 	 * @remarks if the value of signal is not on the list above, a packet 
 	 * will still be sent to nic, it will just need to be dealt with on
@@ -77,6 +80,16 @@ public class ATMRouter implements IATMCellConsumer{
 			sigCell.setIsOAM(true);
 			if(signal.contains("ack")) sentConnectAck(sigCell);
 			else sentConnect(sigCell);
+		}
+		else if(signal.contains("end")){
+			sigCell = new ATMCell(0,signal,oldCell.getTraceID());
+			sigCell.setIsOAM(true);
+			if(signal.contains("ack")) sentEndAck(sigCell);
+			else sentEnd(sigCell);
+		}
+		else{
+			System.err.println("Router " + address + "tried to send an unknown signal");
+			return;
 		}
 		nic.sendCell(sigCell, this);
 	}
@@ -225,11 +238,67 @@ public class ATMRouter implements IATMCellConsumer{
 	}
 	
 	/**
-	 * TODO fill in the comments for this method
-	 * @param cell
+	 * Process the "connect ack" signal.  Prints to terminal to verify to user that
+	 * the signal was received.
+	 * @param cell - the cell containing the signal
 	 */
 	private void processConnectAck(ATMCell cell) {
 		receiveConnectAck(cell);
+	}
+	
+	/**
+	 * Process the "end <VC number>" signal.  Tears down the input VC number specified in 
+	 * the signal and passes the signal to the next router on the corresponding output VC.
+	 * Once the VC has been deleted, an "end ack" signal is sent back to the originating router.
+	 * If the input VC does not exist at this router, cellNoVC() is called.  If this router
+	 * is the terminal point for this VC, the signal is not forwarded. 
+	 * @param cell - the cell containing the signal
+	 * @param nic - the NIC from which the signal was received
+	 */
+	private void processEnd(ATMCell cell, ATMNIC nic){
+		String cellData = cell.getData();
+		int endVC = getIntFromEndOfString(cellData);
+		int outVC; //The VC which endVC is mapped to (if any)
+		NICVCPair outPair; //The outgoing NIC/VC pairing (if it exists)
+		
+		//error checking
+		if(endVC < 0){
+			receivedBadCell(cell);
+			return;
+		}
+		
+		if(VCtoVC.containsKey(endVC)){
+			//The "end" signal was for a valid VC number
+			sendSignal(nic, "end ack", cell);
+			
+			outPair = VCtoVC.get(endVC);
+			
+			if(outPair != null){ //if outPair == null, this is the end of the circuit
+				outVC = outPair.getVC();
+				sendSignal(outPair.getNIC(), "end " + outVC, cell);
+				System.out.println("Trace (ATMRouter): Router " + address + 
+				" removing entry <" + endVC + "," + outVC + ">");
+			}
+			else{
+				System.out.println("Trace (ATMRouter): VC " + endVC + " torn down.");
+			}
+			//evict the entry from the VC table.
+			VCtoVC.remove(endVC);
+			
+		}
+		else{
+			//This router doesn't have an entry for the received VC
+			cellNoVC(cell);
+		}
+	}
+	
+	/**
+	 * Process the "end ack" signal.  Prints to terminal to verify to user that the 
+	 * message was received.
+	 * @param cell - the cell containing the signal
+	 */
+	private void processEndAck(ATMCell cell){
+		receivedEndAck(cell);
 	}
 	
 	/**
@@ -258,6 +327,10 @@ public class ATMRouter implements IATMCellConsumer{
 		else if(cellData.contains("connect")){
 			if(cellData.contains("ack")) processConnectAck(cell);
 			else processConnect(cell,nic);
+		}
+		else if(cellData.contains("end")){
+			if(cellData.contains("ack")) processEndAck(cell);
+			else processEnd(cell,nic);
 		}
 		else{
 			receivedUnknownSignal(cell);
