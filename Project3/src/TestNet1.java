@@ -149,23 +149,43 @@ public class TestNet1 {
 	 */
 	@Test
 	public void testNet1Test2(){
-		System.out.println("**TestNet1 Test 2**");
+		System.out.println("**TestNet1: Test \"end\" signal**");
 
 		// Setup a connection from comp1 to router 13 and comp2 to 14
 		tock();
-		//comp1.sendPacket(500);
 		comp1.setupConnection(13);
 		comp2.setupConnection(14);
-		for(int i=0; i<12; i++)
+		for(int i=0; i<6; i++)
 			this.tock();
+		//Try to tear down a VC before one is setup
 		comp1.endConnection();
+		for(int i=0; i<7; i++)
+			this.tock();
+		//VCs will be established at this point.  Try to tear them down for real now.
 		comp2.endConnection();
+		comp1.endConnection();
 		for(int i=0;i<10;i++)
 			tock();
-		//comp1.sendPacket(500);
-		//for(int i=0; i<8; i++)
-			//this.tock();
 		Assert.assertTrue(true);
+	}
+	
+	/**
+	 * Test the tail drop mechanism by bombarding a NIC with packets and seeing
+	 * if it starts dropping after it receives maximumBufferCells packets.
+	 */
+	@Test
+	public void TestTailDrop(){
+		System.out.println("**Test Net 1: Test Tail Drop**");
+		
+		//Start out setting up connections normally.
+		tock();
+		comp2.setupConnection(11);
+		for(int i = 0; i<3;i++)
+			tock();
+		//bombard comp 2's NIC with packets.  30-maxBufferCells should get dropped.
+		for(int i= 0; i<30;i++){
+			comp2.sendPacket(5);
+		}
 	}
 	
 }

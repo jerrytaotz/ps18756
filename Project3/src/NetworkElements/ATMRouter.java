@@ -263,7 +263,7 @@ public class ATMRouter implements IATMCellConsumer{
 		
 		//error checking
 		if(endVC < 0){
-			receivedBadCell(cell);
+			cellNoVC(cell);
 			return;
 		}
 		
