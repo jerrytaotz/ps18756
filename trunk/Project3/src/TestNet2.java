@@ -204,4 +204,47 @@ public class TestNet2 {
 			this.tock();
 	}
 	
+	/**
+	 * A test to make sure tail drop works in this second network.
+	 */
+	@Test
+	public void TestNet2TestTailDrop(){
+		// Setup a connection from comp1 to router 7
+		System.out.println("**Test Net 2: Test Tail Drop**");
+		tock();
+		comp1.setupConnection(5);
+		for(int i=0; i<12; i++)
+			this.tock();
+		for(int i = 0;i<30;i++)
+			comp1.sendPacket(5);
+		this.tock();
+		for(int i = 0; i<25; i++)
+			comp1.sendPacket(5);
+		
+	}
+	
+	/**
+	 * A test to make sure RED works in this second network.
+	 */
+	@Test
+	public void TestNet2TestRED(){
+		// Setup a connection from comp1 to router 7
+		System.out.println("**Test Net 2: Test RED**");
+		
+		for(int i = 0; i<this.allConsumers.size();i++){
+			allConsumers.get(i).useRED();
+		}
+		tock();
+		//Setup a connection just to test RED in presence of other traffic.
+		comp2.setupConnection(6);
+		for(int i=0; i<3; i++)
+			this.tock();
+		for(int i = 0;i<30;i++)
+			comp1.sendPacket(5);
+		this.tock();
+		for(int i = 0; i<50; i++)
+			comp1.sendPacket(5);
+		
+	}
+	
 }

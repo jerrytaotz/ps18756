@@ -18,7 +18,12 @@ public class ATMNIC {
 	private ArrayList<ATMCell> outputBuffer = new ArrayList<ATMCell>(); // Where cells are put to be outputted
 	private boolean tail=true, red=false, ppd=false, epd=false; // set what type of drop mechanism
 	private int maximumBufferCells = 20; // the maximum number of cells in the output buffer
-	private int startDropAt = 10; // the minimum number of cells in the output buffer before we start dropping cells
+	
+	private int REDMinThresh = 10; //The minimum number of cells in the output buffer before we start dropping cells
+	private int REDMaxThresh = 20; //The maximum average number of cells to allow in the output buffer.
+	private int REDSumOfSizes;
+	private int count; //count is total # of packets ever in queue
+	private double REDAvg; //average queue size for RED
 	
 	/**
 	 * Default constructor for an ATM NIC
@@ -82,10 +87,44 @@ public class ATMNIC {
 	 * @since 1.0
 	 */
 	private void runRED(ATMCell cell){
+		Random rnd = new Random();
 		boolean cellDropped = false;
 		double dropProbability = 0.0;
+		double aveInt;
+		int sidesOfADie; //used to "roll a die" to see if packet gets dropped or not
 		
-		outputBuffer.add(cell);
+		//calculate the average queue size
+		System.out.println("REDSumOfSizes" + REDSumOfSizes);
+		this.REDAvg = (double)REDSumOfSizes/(double)++count;
+		aveInt = Math.rint(REDAvg);
+		
+		//If the average is between the min and max thresh
+		if(REDMaxThresh>aveInt && REDMinThresh < aveInt){
+			//calculate the drop probability
+			dropProbability = (aveInt - (double)REDMinThresh)/
+				(double)(REDMaxThresh - REDMinThresh);
+			//Create a "die" to roll for this packet
+			sidesOfADie = (int)Math.rint(1.0/dropProbability);
+			System.out.println("Ave Queue Size: " + aveInt + " (in prob. drop zone).");
+			System.out.println("Drop Prob: 1/" + sidesOfADie);
+			//1 in sidesOfADie probability that packet gets dropped.
+			if((rnd.nextInt(sidesOfADie) + 1) == 1){
+				cellDropped = true;
+			}
+			else{
+				outputBuffer.add(cell);
+				REDSumOfSizes += outputBuffer.size();
+			}
+		}
+		else if(REDMaxThresh < aveInt){
+			System.out.println("Ave Queue Size: " + aveInt + " (> RED Max Threshold)");
+			cellDropped = true;
+		}
+		else{
+			System.out.println("Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
+			outputBuffer.add(cell);
+			REDSumOfSizes += outputBuffer.size();
+		}
 		
 		// Output to the console what happened
 		if(cellDropped)
@@ -147,6 +186,11 @@ public class ATMNIC {
 	 * @since 1.0
 	 */
 	public void setIsRED(){
+		
+		this.REDAvg = 0;
+		this.count = 0;
+		this.REDSumOfSizes = 0;
+		
 		this.red=true;
 		this.tail=false;
 		this.ppd=false;

@@ -188,4 +188,22 @@ public class TestNet1 {
 		}
 	}
 	
+	/**
+	 * Test the tail drop mechanism by bombarding a NIC with packets and seeing
+	 * if it starts dropping after it receives maximumBufferCells packets.
+	 */
+	@Test
+	public void TestRED(){
+		System.out.println("**Test Net 1: Test RED**");
+		
+		for(int i= 0; i< this.allConsumers.size();i++){
+			allConsumers.get(i).useRED();
+		}
+			
+		//bombard comp 2's NIC with packets.
+		for(int i= 0; i<70;i++){
+			comp2.sendPacket(5);
+		}
+	}
+	
 }

@@ -17,7 +17,7 @@ public class ATMRouter implements IATMCellConsumer{
 	private TreeMap<Integer, NICVCPair> VCtoVC = new TreeMap<Integer, NICVCPair>(); // a map of input VC to output nic and new VC number
 	private boolean trace=false; // should we print out debug code?
 	private int traceID = (int) (Math.random() * 100000); // create a random trace id for cells
-	private ATMNIC currentConnAttemptNIC = null; // The nic that is currently trying to setup a connection
+	private ATMNIC currentConnAttemptNIC = null; //Used to detect current connection attempts
 	private boolean displayCommands = true; // should we output the commands that are received?
 	
 	/**
@@ -95,7 +95,10 @@ public class ATMRouter implements IATMCellConsumer{
 	}
 	
 	/**
-	 * Process a setup signal.
+	 * Process a setup signal.  The router will forward a setup message from
+	 * any NIC which is not in the process of setting up a connection already.
+	 * If this is the destination router, it establishes a VC and forwards a 
+	 * connect signal back down the path.
 	 * @param cell - the cell containing the setup signal
 	 * @param nic - the nic which the cell came from
 	 */
@@ -112,17 +115,17 @@ public class ATMRouter implements IATMCellConsumer{
 		}
 		
 		receivedSetup(cell);
-		//check whether this router is busy or not and send wait() if it is
+		//check whether this NIC is busy or not and send wait() if it is
 		if(currentConnAttemptNIC != null){
 			sendSignal(nic,"wait " + destAddress,cell);
 		}
 		//set up the outgoing NIC
 		else{
-			currentConnAttemptNIC = nic;
-			sendSignal(currentConnAttemptNIC,"call proceeding",cell);
+			sendSignal(nic,"call proceeding",cell);
 			nextHopNIC = nextHop.get(destAddress);
-			/*check if the dest. address has been entered into this router's tables*/
+			//check if the dest. address has been entered into this router's tables
 			if(nextHopNIC != null){
+				currentConnAttemptNIC = nic;
 				sendSignal(nextHopNIC, "setup " + destAddress, cell);
 			}
 			//if this is the destination router.
@@ -130,8 +133,7 @@ public class ATMRouter implements IATMCellConsumer{
 				int inVC = calcInVC();
 				System.out.println("Trace (ATMRouter): First free VC = " + inVC);
 				//set up a VC to use and forward that back down the way.
-				sendSignal(currentConnAttemptNIC,"connect " + inVC,cell);
-				currentConnAttemptNIC = null;
+				sendSignal(nic,"connect " + inVC,cell);
 				//the null entry signifies that this is a terminal point for a VC
 				VCtoVC.put(inVC, null);
 			}
@@ -208,7 +210,7 @@ public class ATMRouter implements IATMCellConsumer{
 		//forward the connect to the next router/computer
 		sendSignal(currentConnAttemptNIC,"connect " + nextInVC,cell);
 		
-		//currentConnAttemptNIC being null indicates this router is free to process
+		//setting this to null indicates this router is free to process
 		//setup messages again.
 		currentConnAttemptNIC = null;
 	}
