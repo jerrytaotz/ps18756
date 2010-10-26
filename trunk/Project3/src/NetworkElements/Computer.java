@@ -125,7 +125,7 @@ public class Computer implements IATMCellConsumer{
 	
 	/**
 	 * Sends a packet from this computer to another ip address (not really since there aren't any place to send...)
-	 * @param size the size of the packet
+	 * @param size the size of the packet in bits
 	 * @since 1.0
 	 * @version 1.2
 	 */
