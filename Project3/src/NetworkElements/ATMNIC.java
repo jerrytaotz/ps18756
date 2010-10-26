@@ -8,6 +8,7 @@
 package NetworkElements;
 
 import DataTypes.*;
+
 import java.util.*;
 
 public class ATMNIC {
@@ -18,12 +19,14 @@ public class ATMNIC {
 	private ArrayList<ATMCell> outputBuffer = new ArrayList<ATMCell>(); // Where cells are put to be outputted
 	private boolean tail=true, red=false, ppd=false, epd=false; // set what type of drop mechanism
 	private int maximumBufferCells = 20; // the maximum number of cells in the output buffer
-	
+	/*RED state parameters*/
 	private int REDMinThresh = 10; //The minimum number of cells in the output buffer before we start dropping cells
 	private int REDMaxThresh = 20; //The maximum average number of cells to allow in the output buffer.
 	private int REDSumOfSizes;
 	private int count; //count is total # of packets ever in queue
 	private double REDAvg; //average queue size for RED
+	/*PPD state parameters*/
+	private boolean droppingAPacket; //is PPD currently dropping an IP packet?
 	
 	/**
 	 * Default constructor for an ATM NIC
@@ -55,7 +58,7 @@ public class ATMNIC {
 		
 		
 		if(this.tail) this.runTailDrop(cell);
-		else if(this.red) this.runRED(cell);
+		else if(this.red) this.runRED(cell,false,false);
 		else if(this.ppd) this.runPPD(cell);
 		else if(this.epd) this.runEPD(cell);
 	}
@@ -71,6 +74,10 @@ public class ATMNIC {
 		if(outputBuffer.size() < maximumBufferCells){
 			outputBuffer.add(cell);
 		}
+		//Never drop an OAM cell.
+		else if(cell.getIsOAM()){
+			forceOAM(cell);
+		}
 		else cellDropped = true;
 		
 		// Output to the console what happened
@@ -82,11 +89,14 @@ public class ATMNIC {
 	}
 	
 	/**
-	 * Runs Random early detection on the cell
+	 * Runs Random early detection on the cell.
 	 * @param cell the cell to be added/dropped from the queue
+	 * @param withPPD set this to true if using RED for PPD
+	 * @param withEPD set this to true if using RED for EPD
+	 * @return true if the cell was admitted, false otherwise;
 	 * @since 1.0
 	 */
-	private void runRED(ATMCell cell){
+	private boolean runRED(ATMCell cell, boolean withPPD, boolean withEPD){
 		Random rnd = new Random();
 		boolean cellDropped = false;
 		double dropProbability = 0.0;
@@ -94,7 +104,7 @@ public class ATMNIC {
 		int sidesOfADie; //used to "roll a die" to see if packet gets dropped or not
 		
 		//calculate the average queue size
-		System.out.println("REDSumOfSizes" + REDSumOfSizes);
+		System.out.println("REDSumOfSizes " + REDSumOfSizes);
 		this.REDAvg = (double)REDSumOfSizes/(double)++count;
 		aveInt = Math.rint(REDAvg);
 		
@@ -107,7 +117,7 @@ public class ATMNIC {
 			sidesOfADie = (int)Math.rint(1.0/dropProbability);
 			System.out.println("Ave Queue Size: " + aveInt + " (in prob. drop zone).");
 			System.out.println("Drop Prob: 1/" + sidesOfADie);
-			//1 in sidesOfADie probability that packet gets dropped.
+			//roll the die. Drop packet on a 1.
 			if((rnd.nextInt(sidesOfADie) + 1) == 1){
 				cellDropped = true;
 			}
@@ -118,7 +128,13 @@ public class ATMNIC {
 		}
 		else if(REDMaxThresh < aveInt){
 			System.out.println("Ave Queue Size: " + aveInt + " (> RED Max Threshold)");
-			cellDropped = true;
+			//If this is an OAM cell we need to force it in by evicting some other cell
+			if(cell.getIsOAM()){
+				forceOAM(cell);
+				return true;
+			}
+			else
+				cellDropped = true;
 		}
 		else{
 			System.out.println("Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
@@ -126,30 +142,81 @@ public class ATMNIC {
 			REDSumOfSizes += outputBuffer.size();
 		}
 		
-		// Output to the console what happened
-		if(cellDropped)
-			System.out.println("The cell " + cell.getTraceID() + " was dropped with probability " + dropProbability);
-		else
-			if(this.trace)
-			System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
+		// Output to the console if not using PPD or EPD
+		if(cellDropped){
+			if(!withPPD && !withEPD)
+				System.out.println("The cell " + cell.getTraceID() + 
+						" was dropped with probability " + dropProbability);
+			return false;
+		}
+		else{
+			if(this.trace && !withPPD && !withEPD)
+				System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
+			return true;
+		}
 	}
 	
 	/**
-	 * Runs Partial packet drop on the cell
+	 * Force an OAM cell into the queue by evicting the first non-OAM cell
+	 * in the queue and replacing it with the OAM cell.  Only call this method
+	 * when the queue is full (or the average queue size is too high.)
+	 * @param cell - the OAM cell which is causing the eviction
+	 * @remarks This method was implemented under the assumption that the 
+	 * output buffer will never be filled with only OAM cells (as posted on discussion board)
+	 * Thus, there will always be at least one non-OAM cell to evict.
+	 */
+	private void forceOAM(ATMCell cell) {
+		ATMCell victim;
+		for(int i = 0;i < this.outputBuffer.size();i++){
+			victim = outputBuffer.get(i);
+			if(!victim.getIsOAM()){
+				outputBuffer.remove(i);
+				outputBuffer.add(cell);
+				System.out.println("Trace (ATMNIC): Evicted a packet in the queue" +
+						"to make room for an OAM cell.");
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Runs Partial packet drop on the cell.  Uses the existing RED method to determine
+	 * whether a packet is dropped or not.  Once a packet gets 
 	 * @param cell the cell to be added/dropped from the queue
 	 * @since 1.0
 	 */
 	private void runPPD(ATMCell cell){
 		boolean cellDropped = false;
 		
-		outputBuffer.add(cell);
+		//If in the process of dropping a packet, check if this is part of
+		//that same packet.
+		if(this.droppingAPacket){
+			//FIRST check OAM.  If it is OAM, just let it go through to RED processing.
+			if(!cell.getIsOAM()){
+				//If it is part of packet being dropped, drop it.
+				if(cell.getPacketData() == null){
+					cellDropped = true;
+				}
+				//If new IP packet allow it to try it's luck with RED
+				else this.droppingAPacket = false;
+			}
+		}
+		
+		if(!this.droppingAPacket || cell.getIsOAM()){
+			//If RED doesn't admit the packet, start dropping all the cells.
+			if(!runRED(cell,true,false)){
+				cellDropped = true;
+				this.droppingAPacket = true;
+			}
+		}
 		
 		// Output to the console what happened
 		if(cellDropped)
-			System.out.println("The cell " + cell.getTraceID() + " was dropped");
+			System.out.println("The cell " + cell.getTraceID() + " was dropped by PPD");
 		else
 			if(this.trace)
-			System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
+			System.out.println("The cell " + cell.getTraceID() + 
+					" was added to the output queue by PPD");
 	}
 	
 	/**
@@ -202,6 +269,7 @@ public class ATMNIC {
 	 * @since 1.0
 	 */
 	public void setIsPPD(){
+		this.droppingAPacket = false;
 		this.red=false;
 		this.tail=false;
 		this.ppd=true;

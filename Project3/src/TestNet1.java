@@ -235,4 +235,36 @@ public class TestNet1 {
 		}
 	}
 	
+	/**
+	 * Tests PPD functionality by sending a few short packets, then a really long one, 
+	 * then an OAM cell just to see if it is forced into the queue.  All this is followed
+	 * by a single small packet which should go through to RED processing rather than being
+	 * immediately dropped by PPD.
+	 */
+	@Test
+	public void TestPPDIngress(){
+		System.out.println("**Test Net 1: Test PPD");
+		
+		for(int i = 0; i< this.allConsumers.size();i++){
+			allConsumers.get(i).usePPD();
+		}
+		
+		comp1.setupConnection(13);
+		for(int i = 0;i < 10; i++){
+			tock();
+		}
+		
+		//Bring the queue close to it's threshold
+		System.out.println("***SENDING 18 SMALL PACKETS***");
+		for(int i = 0;i<18; i++){
+			comp1.sendPacket(30);
+		}
+		System.out.println("***SENDING A BIG PACKET***");
+		comp1.sendPacket(3000);
+		System.out.println("***SENDING AN OAM SIGNAL***");
+		comp1.endConnection();
+		tock();
+		System.out.println("***SENDING ONE LAST SMALL PACKET***");
+		comp1.sendPacket(30);
+	}
 }
