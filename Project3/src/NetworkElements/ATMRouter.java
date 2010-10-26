@@ -15,7 +15,7 @@ public class ATMRouter implements IATMCellConsumer{
 	private ArrayList<ATMNIC> nics = new ArrayList<ATMNIC>(); // all of the nics in this router
 	private TreeMap<Integer, ATMNIC> nextHop = new TreeMap<Integer, ATMNIC>(); // a map of which interface to use to get to a given router on the network
 	private TreeMap<Integer, NICVCPair> VCtoVC = new TreeMap<Integer, NICVCPair>(); // a map of input VC to output nic and new VC number
-	private boolean trace=false; // should we print out debug code?
+	private boolean trace=true; // should we print out debug code?
 	private int traceID = (int) (Math.random() * 100000); // create a random trace id for cells
 	private ATMNIC currentConnAttemptNIC = null; //Used to detect current connection attempts
 	private boolean displayCommands = true; // should we output the commands that are received?
@@ -36,6 +36,149 @@ public class ATMRouter implements IATMCellConsumer{
 	 */
 	public void addNIC(ATMNIC nic){
 		this.nics.add(nic);
+	}
+	
+
+	/**
+	 * This method processes data and OAM cells that arrive from any nic in the router
+	 * @param cell the cell that arrived at this router
+	 * @param nic the nic that the cell arrived on
+	 * @since 1.0
+	 */
+	public void receiveCell(ATMCell cell, ATMNIC nic){
+		NICVCPair forwardingPair;
+		int forwardingVC;
+		ATMNIC forwardingNIC;
+		ATMCell forwardingCell;
+		
+		if(trace)
+			System.out.println("Trace (ATMRouter): Received a cell " + cell.getTraceID());
+		
+		if(cell.getIsOAM()){
+			// OAM is used for signaling so here we just process the signals
+			this.processOAMSignal(cell,nic);
+		}
+		else{
+			// find the nic and new VC number to forward the cell on
+			// otherwise the cell has nowhere to go. output to the console and drop the cell
+			forwardingPair = VCtoVC.get(cell.getVC());
+			if(forwardingPair != null){
+				forwardingVC = forwardingPair.getVC();
+				forwardingNIC = forwardingPair.getNIC();
+				forwardingCell = new ATMCell(forwardingVC, cell.getData(), cell.getTraceID());
+				forwardingNIC.sendCell(forwardingCell, this);
+			}
+			//if this is the destination or a bad address just drop it.
+			else{
+				System.out.println("Trace (ATMRouter): Dropped an ATM cell either because" +
+						"it contained an invalid address or because it reached its dest.");
+			}
+		}		
+	}
+	
+	/**
+	 * This method returns a sequentially increasing random trace ID, so that we can
+	 * differentiate cells in the network
+	 * @return the trace id for the next cell
+	 * @since 1.0
+	 */
+	public int getTraceID(){
+		int ret = this.traceID;
+		this.traceID++;
+		return ret;
+	}
+	
+	/**
+	 * Tells the router the nic to use to get towards a given router on the network
+	 * @param destAddress the destination address of the ATM router
+	 * @param outInterface the interface to use to connect to that router
+	 * @since 1.0
+	 */
+	public void addNextHopInterface(int destAddress, ATMNIC outInterface){
+		this.nextHop.put(destAddress, outInterface);
+	}
+	
+	/**
+	 * Makes each nic move its cells from the output buffer across the link to the next router's nic
+	 * @since 1.0
+	 */
+	public void clearOutputBuffers(){
+		for(int i=0; i<this.nics.size(); i++)
+			this.nics.get(i).clearOutputBuffers();
+	}
+	
+	/**
+	 * Makes each nic move all of its cells from the input buffer to the output buffer
+	 * @since 1.0
+	 */
+	public void clearInputBuffers(){
+		for(int i=0; i<this.nics.size(); i++)
+			this.nics.get(i).clearInputBuffers();
+	}
+	
+	/**
+	 * Sets the nics in the router to use tail drop as their drop mechanism
+	 * @since 1.0
+	 */
+	public void useTailDrop(){
+		for(int i=0; i<this.nics.size(); i++)
+			nics.get(i).setIsTailDrop();
+	}
+	
+	/**
+	 * Sets the nics in the router to use RED as their drop mechanism
+	 * @since 1.0
+	 */
+	public void useRED(){
+		for(int i=0; i<this.nics.size(); i++)
+			nics.get(i).setIsRED();
+	}
+	
+	/**
+	 * Sets the nics in the router to use PPD as their drop mechanism
+	 * @since 1.0
+	 */
+	public void usePPD(){
+		for(int i=0; i<this.nics.size(); i++)
+			nics.get(i).setIsPPD();
+	}
+	
+	/**
+	 * Sets the nics in the router to use EPD as their drop mechanism
+	 * @since 1.0
+	 */
+	public void useEPD(){
+		for(int i=0; i<this.nics.size(); i++)
+			nics.get(i).setIsEPD();
+	}
+	
+	/**
+	 * Sets if the commands should be displayed from the router in the console
+	 * @param displayComments should the commands be displayed or not?
+	 * @since 1.0
+	 */
+	public void displayCommands(boolean displayCommands){
+		this.displayCommands = displayCommands;
+	}
+	
+	/**
+	 * Outputs to the console that a cell has been dropped because it reached its destination
+	 * @since 1.0
+	 */
+	public void cellDeadEnd(ATMCell cell){
+		if(this.displayCommands)
+		System.out.println("The cell is destined for this router (" + 
+				this.address + "), taken off network " + cell.getTraceID());
+	}
+	
+	/**
+	 * Outputs to the console that a cell has been dropped as no such VC exists
+	 * @since 1.0
+	 */
+	public void cellNoVC(ATMCell cell){
+		if(this.displayCommands)
+		System.out.println("The cell is trying to be sent on an incorrect VC " 
+				+ cell.getTraceID());
 	}
 	
 	/**
@@ -340,27 +483,6 @@ public class ATMRouter implements IATMCellConsumer{
 	}
 
 	/**
-	 * This method processes data and OAM cells that arrive from any nic in the router
-	 * @param cell the cell that arrived at this router
-	 * @param nic the nic that the cell arrived on
-	 * @since 1.0
-	 */
-	public void receiveCell(ATMCell cell, ATMNIC nic){
-		
-		if(trace)
-			System.out.println("Trace (ATMRouter): Received a cell " + cell.getTraceID());
-		
-		if(cell.getIsOAM()){
-			// OAM is used for signaling so here we just process the signals
-			this.processOAMSignal(cell,nic);
-		}
-		else{
-			// find the nic and new VC number to forward the cell on
-			// otherwise the cell has nowhere to go. output to the console and drop the cell
-		}		
-	}
-	
-	/**
 	 * Gets the number from the end of a string
 	 * @param string the sting to try and get a number from
 	 * @return the number from the end of the string, or -1 if the end of the string is not a number
@@ -379,112 +501,7 @@ public class ATMRouter implements IATMCellConsumer{
 			return -1;
 		}
 	}
-	
-	/**
-	 * This method returns a sequentially increasing random trace ID, so that we can
-	 * differentiate cells in the network
-	 * @return the trace id for the next cell
-	 * @since 1.0
-	 */
-	public int getTraceID(){
-		int ret = this.traceID;
-		this.traceID++;
-		return ret;
-	}
-	
-	/**
-	 * Tells the router the nic to use to get towards a given router on the network
-	 * @param destAddress the destination address of the ATM router
-	 * @param outInterface the interface to use to connect to that router
-	 * @since 1.0
-	 */
-	public void addNextHopInterface(int destAddress, ATMNIC outInterface){
-		this.nextHop.put(destAddress, outInterface);
-	}
-	
-	/**
-	 * Makes each nic move its cells from the output buffer across the link to the next router's nic
-	 * @since 1.0
-	 */
-	public void clearOutputBuffers(){
-		for(int i=0; i<this.nics.size(); i++)
-			this.nics.get(i).clearOutputBuffers();
-	}
-	
-	/**
-	 * Makes each nic move all of its cells from the input buffer to the output buffer
-	 * @since 1.0
-	 */
-	public void clearInputBuffers(){
-		for(int i=0; i<this.nics.size(); i++)
-			this.nics.get(i).clearInputBuffers();
-	}
-	
-	/**
-	 * Sets the nics in the router to use tail drop as their drop mechanism
-	 * @since 1.0
-	 */
-	public void useTailDrop(){
-		for(int i=0; i<this.nics.size(); i++)
-			nics.get(i).setIsTailDrop();
-	}
-	
-	/**
-	 * Sets the nics in the router to use RED as their drop mechanism
-	 * @since 1.0
-	 */
-	public void useRED(){
-		for(int i=0; i<this.nics.size(); i++)
-			nics.get(i).setIsRED();
-	}
-	
-	/**
-	 * Sets the nics in the router to use PPD as their drop mechanism
-	 * @since 1.0
-	 */
-	public void usePPD(){
-		for(int i=0; i<this.nics.size(); i++)
-			nics.get(i).setIsPPD();
-	}
-	
-	/**
-	 * Sets the nics in the router to use EPD as their drop mechanism
-	 * @since 1.0
-	 */
-	public void useEPD(){
-		for(int i=0; i<this.nics.size(); i++)
-			nics.get(i).setIsEPD();
-	}
-	
-	/**
-	 * Sets if the commands should be displayed from the router in the console
-	 * @param displayComments should the commands be displayed or not?
-	 * @since 1.0
-	 */
-	public void displayCommands(boolean displayCommands){
-		this.displayCommands = displayCommands;
-	}
-	
-	/**
-	 * Outputs to the console that a cell has been dropped because it reached its destination
-	 * @since 1.0
-	 */
-	public void cellDeadEnd(ATMCell cell){
-		if(this.displayCommands)
-		System.out.println("The cell is destined for this router (" + 
-				this.address + "), taken off network " + cell.getTraceID());
-	}
-	
-	/**
-	 * Outputs to the console that a cell has been dropped as no such VC exists
-	 * @since 1.0
-	 */
-	public void cellNoVC(ATMCell cell){
-		if(this.displayCommands)
-		System.out.println("The cell is trying to be sent on an incorrect VC " 
-				+ cell.getTraceID());
-	}
-	
+
 	/**
 	 * Error Handling function to handle unknown (bad) cell formats.
 	 * @param cell - the cell which was received
@@ -676,4 +693,5 @@ int VCNum = getIntFromEndOfString(cell.getData());
 			System.out.println("Label mapping (Router " + this.address + "): <" +
 					inVC + "," + outPair.getVC() + ">");
 	}
+	
 }

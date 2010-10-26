@@ -174,8 +174,8 @@ public class TestNet1 {
 	 * if it starts dropping after it receives maximumBufferCells packets.
 	 */
 	@Test
-	public void TestTailDrop(){
-		System.out.println("**Test Net 1: Test Tail Drop**");
+	public void TestTailDropIngress(){
+		System.out.println("**Test Net 1: Test Tail Drop at Ingress**");
 		
 		//Start out setting up connections normally.
 		tock();
@@ -186,6 +186,35 @@ public class TestNet1 {
 		for(int i= 0; i<30;i++){
 			comp2.sendPacket(5);
 		}
+	}
+	
+	/**
+	 * Test the tail drop mechanism at an intermediate router by overloading
+	 * router 3 with traffic from router 9 and computer 2.
+	 */
+	@Test
+	public void TestTailDropIntermediate(){
+		System.out.println("**Test Net 1: Test Tail Drop at Intermediate**");
+		
+		//Start out setting up connections normally.
+		tock();
+		comp2.setupConnection(13);
+		comp1.setupConnection(14);
+		for(int i = 0; i<12;i++)
+			tock();
+		//fill comp1's NIC with packets.
+		for(int i = 0;i<20;i++){
+			comp1.sendPacket(5);
+		}
+		//load router 9 up with these 20 packets
+		tock();
+		//fill comp2's NIC with packets.
+		for(int i= 0; i<20;i++){
+			comp2.sendPacket(5);
+		}
+		//Now send everything to router 3
+		tock();
+		
 	}
 	
 	/**
