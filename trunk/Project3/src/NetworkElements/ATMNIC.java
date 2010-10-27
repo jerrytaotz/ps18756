@@ -22,12 +22,10 @@ public class ATMNIC {
 	/*RED state parameters*/
 	private int REDMinThresh = 10; //The minimum number of cells in the output buffer before we start dropping cells
 	private int REDMaxThresh = 20; //The maximum average number of cells to allow in the output buffer.
-	private int REDSumOfSizes;
-	private int count; //count is total # of packets ever in queue
 	private double REDAvg; //average queue size for RED
 	/*PPD state parameters*/
 	private boolean droppingAPacket; //is PPD currently dropping an IP packet?
-	
+
 	/**
 	 * Default constructor for an ATM NIC
 	 * @param parent
@@ -37,7 +35,7 @@ public class ATMNIC {
 		this.parent = parent;
 		this.parent.addNIC(this);
 	}
-	
+
 	/**
 	 * This method is called when a cell is passed to this nic to be sent. The cell is placed
 	 * in an output buffer until a time unit passes
@@ -55,14 +53,14 @@ public class ATMNIC {
 			if(cell==null)
 				System.out.println("Warning (ATM NIC): You are sending a null cell");
 		}
-		
-		
+
+
 		if(this.tail) this.runTailDrop(cell);
 		else if(this.red) this.runRED(cell,false,false);
 		else if(this.ppd) this.runPPD(cell);
 		else if(this.epd) this.runEPD(cell);
 	}
-	
+
 	/**
 	 * Runs tail drop on the cell
 	 * @param cell the cell to be added/dropped
@@ -70,7 +68,7 @@ public class ATMNIC {
 	 */
 	private void runTailDrop(ATMCell cell){
 		boolean cellDropped = false;
-		
+
 		if(outputBuffer.size() < maximumBufferCells){
 			outputBuffer.add(cell);
 		}
@@ -79,17 +77,18 @@ public class ATMNIC {
 			forceOAM(cell);
 		}
 		else cellDropped = true;
-		
+
 		// Output to the console what happened
 		if(cellDropped)
 			System.out.println("The cell " + cell.getTraceID() + " was tail dropped");
 		else
 			if(this.trace)
-			System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
+				System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
 	}
-	
+
 	/**
-	 * Runs Random early detection on the cell.
+	 * Runs Random early detection on the cell.  Computes the average queue length over time
+	 * and drops 
 	 * @param cell the cell to be added/dropped from the queue
 	 * @param withPPD set this to true if using RED for PPD
 	 * @param withEPD set this to true if using RED for EPD
@@ -102,17 +101,19 @@ public class ATMNIC {
 		double dropProbability = 0.0;
 		double aveInt;
 		int sidesOfADie; //used to "roll a die" to see if packet gets dropped or not
-		
+
 		//calculate the average queue size
-		System.out.println("REDSumOfSizes " + REDSumOfSizes);
-		this.REDAvg = (double)REDSumOfSizes/(double)++count;
-		aveInt = Math.rint(REDAvg);
+		//System.out.println("REDSumOfSizes " + REDSumOfSizes);
+		//this.REDAvg = (double)REDSumOfSizes/(double)++count;
+		//aveInt = Math.rint(REDAvg);
+		
+		aveInt = (REDAvg + (outputBuffer.size() + 1))/2;
 		
 		//If the average is between the min and max thresh
 		if(REDMaxThresh>aveInt && REDMinThresh < aveInt){
 			//calculate the drop probability
 			dropProbability = (aveInt - (double)REDMinThresh)/
-				(double)(REDMaxThresh - REDMinThresh);
+			(double)(REDMaxThresh - REDMinThresh);
 			//Create a "die" to roll for this packet
 			sidesOfADie = (int)Math.rint(1.0/dropProbability);
 			System.out.println("Ave Queue Size: " + aveInt + " (in prob. drop zone).");
@@ -123,7 +124,7 @@ public class ATMNIC {
 			}
 			else{
 				outputBuffer.add(cell);
-				REDSumOfSizes += outputBuffer.size();
+				//REDSumOfSizes += outputBuffer.size();
 			}
 		}
 		else if(REDMaxThresh < aveInt){
@@ -139,10 +140,11 @@ public class ATMNIC {
 		else{
 			System.out.println("Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
 			outputBuffer.add(cell);
-			REDSumOfSizes += outputBuffer.size();
+			//REDSumOfSizes += outputBuffer.size();
 		}
-		
-		// Output to the console if not using PPD or EPD
+
+		// Output to the console if not using RED for PPD or EPD, otherwise they will
+		// handle it on their own.
 		if(cellDropped){
 			if(!withPPD && !withEPD)
 				System.out.println("The cell " + cell.getTraceID() + 
@@ -155,7 +157,7 @@ public class ATMNIC {
 			return true;
 		}
 	}
-	
+
 	/**
 	 * Force an OAM cell into the queue by evicting the first non-OAM cell
 	 * in the queue and replacing it with the OAM cell.  Only call this method
@@ -173,7 +175,7 @@ public class ATMNIC {
 				outputBuffer.remove(i);
 				outputBuffer.add(cell);
 				System.out.println("Trace (ATMNIC): Evicted a packet in the queue" +
-						"to make room for an OAM cell.");
+				"to make room for an OAM cell.");
 				return;
 			}
 		}
@@ -187,7 +189,7 @@ public class ATMNIC {
 	 */
 	private void runPPD(ATMCell cell){
 		boolean cellDropped = false;
-		
+
 		//If in the process of dropping a packet, check if this is part of
 		//that same packet.
 		if(this.droppingAPacket){
@@ -201,7 +203,7 @@ public class ATMNIC {
 				else this.droppingAPacket = false;
 			}
 		}
-		
+
 		if(!this.droppingAPacket || cell.getIsOAM()){
 			//If RED doesn't admit the packet, start dropping all the cells.
 			if(!runRED(cell,true,false)){
@@ -209,16 +211,16 @@ public class ATMNIC {
 				this.droppingAPacket = true;
 			}
 		}
-		
+
 		// Output to the console what happened
 		if(cellDropped)
-			System.out.println("The cell " + cell.getTraceID() + " was dropped by PPD");
+			System.out.println("The cell " + cell.getTraceID() + " was dropped");
 		else
 			if(this.trace)
-			System.out.println("The cell " + cell.getTraceID() + 
-					" was added to the output queue by PPD");
+				System.out.println("The cell " + cell.getTraceID() + 
+				" was added to the output queue");
 	}
-	
+
 	/**
 	 * Runs Early packet drop on the cell
 	 * @param cell the cell to be added/dropped from the queue
@@ -227,16 +229,88 @@ public class ATMNIC {
 	private void runEPD(ATMCell cell){
 		boolean cellDropped = false;
 		
-		outputBuffer.add(cell);
-		
+		/*//check if cell is OAM, if it is, let it through.
+		if(cell.getIsOAM()){
+			forceOAM(cell);
+		}*/
+		//if cell is not an IP header, check if packet is being dropped.
+		if(cell.getPacketData() == null){
+			//if so, drop it as long as it's not an OAM cell.
+			if(this.droppingAPacket && !cell.getIsOAM()) cellDropped = true;
+			//if not dropping, let it go through RED (which will also handle OAM).
+			cellDropped = !this.runRED(cell,false,true);
+		}
+		//if cell IS an IP header, we need to run a RED simulation on it.
+		else{
+			cellDropped = !this.runREDSimulation(cell);
+			if(cellDropped = false)
+				cellDropped = this.runRED(cell, false, true);
+		}		
 		// Output to the console what happened
 		if(cellDropped)
 			System.out.println("The cell " + cell.getTraceID() + " was dropped");
 		else
 			if(this.trace)
-			System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
+				System.out.println("The cell " + cell.getTraceID() + " was added to the output queue");
 	}
-	
+
+	/**
+	 * Run a simulation of the RED algorithm of an IP cell to determine if any of its
+	 * cells will be dropped or not.
+	 * @param cell the cell containing the IP header we want to analyze
+	 * @return true if the entire packet would make it through, false otherwise.
+	 */
+	private boolean runREDSimulation(ATMCell cell) {
+		boolean cellDropped = false,packetAdmitted = false;
+		int packetLen = 0,numCells = 0;
+		int sidesOfADie;
+		ArrayList<ATMCell> virtualOutputBuffer = (ArrayList<ATMCell>)this.outputBuffer.clone();
+		double aveInt,dropProbability = 0.0;
+		Random rnd = new Random();
+
+		//1. get the length of the IP packet
+		packetLen = cell.getPacketData().getSize();
+		//2. Divide the length across x ATM cells
+		numCells = packetLen/ATMCell.CELL_SIZE + 1;
+		System.out.println("(REDSIM) A packet of length " + packetLen + " is divided across" + 
+				numCells + " cells.");
+
+		//3. Run RED simulation using a virtual buffer and virtual counter for each cell
+		for(int i = 0;i<numCells;i++){
+			//calculate the average queue size
+			aveInt = (REDAvg + (virtualOutputBuffer.size() + 1))/2;
+			
+			//If the average is between the min and max thresh
+			if(REDMaxThresh>aveInt && REDMinThresh < aveInt){
+				//calculate the drop probability
+				dropProbability = (aveInt - (double)REDMinThresh)/
+				(double)(REDMaxThresh - REDMinThresh);
+				//Create a "die" to roll for this packet
+				sidesOfADie = (int)Math.rint(1.0/dropProbability);
+				System.out.println("(REDSIM) Ave Queue Size: " + aveInt + " (in prob. drop zone).");
+				System.out.println("(REDSIM) Drop Prob: 1/" + sidesOfADie);
+				//roll the die. Drop packet on a 1.
+				if((rnd.nextInt(sidesOfADie) + 1) == 1){
+					cellDropped = true;
+				}
+				else{
+					virtualOutputBuffer.add(cell);
+				}
+			}
+			else if(REDMaxThresh < aveInt){
+				cellDropped = true;
+			}
+			else{
+				System.out.println("(REDSIM)Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
+				virtualOutputBuffer.add(cell);
+			}
+			//Is the packet still good to go?
+			packetAdmitted = packetAdmitted || cellDropped;
+		}
+		//4. if ANY cell would be dropped, drop the entire packet
+		return packetAdmitted;
+	}
+
 	/**
 	 * Sets that the nic should use Tail drop when deciding weather or not to add cells to the queue
 	 * @since 1.0
@@ -247,23 +321,21 @@ public class ATMNIC {
 		this.ppd=false;
 		this.epd=false;
 	}
-	
+
 	/**
 	 * Sets that the nic should use RED when deciding weather or not to add cells to the queue
 	 * @since 1.0
 	 */
 	public void setIsRED(){
-		
+
 		this.REDAvg = 0;
-		this.count = 0;
-		this.REDSumOfSizes = 0;
-		
+
 		this.red=true;
 		this.tail=false;
 		this.ppd=false;
 		this.epd=false;
 	}
-	
+
 	/**
 	 * Sets that the nic should use PPD when deciding weather or not to add cells to the queue
 	 * @since 1.0
@@ -275,7 +347,7 @@ public class ATMNIC {
 		this.ppd=true;
 		this.epd=false;
 	}
-	
+
 	/**
 	 * Sets that the nic should use EPD when deciding weather or not to add cells to the queue
 	 * @since 1.0
@@ -286,7 +358,7 @@ public class ATMNIC {
 		this.ppd=false;
 		this.epd=true;
 	}
-	
+
 	/**
 	 * This method connects a link to this nic
 	 * @param link the link to connect to this nic
@@ -295,7 +367,7 @@ public class ATMNIC {
 	public void connectOtoOLink(OtoOLink link){
 		this.link = link;
 	}
-	
+
 	/**
 	 * This method is called when a cell is received over the link that this nic is connected to
 	 * @param cell the cell that was received
@@ -305,7 +377,7 @@ public class ATMNIC {
 		this.inputBuffer.add(cell);
 
 	}
-	
+
 	/**
 	 * Moves the cells from the output buffer to the line (then they get moved to the next nic's input buffer)
 	 * @since 1.0
@@ -315,7 +387,7 @@ public class ATMNIC {
 			this.link.sendCell(this.outputBuffer.get(i), this);
 		this.outputBuffer.clear();
 	}
-	
+
 	/**
 	 * Moves cells from this nics input buffer to its output buffer
 	 * @since 1.0

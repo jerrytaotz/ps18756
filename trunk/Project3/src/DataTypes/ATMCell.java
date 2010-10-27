@@ -13,6 +13,7 @@ public class ATMCell {
 	private IPPacket packetData = null; // the IP packet header
 	private String data = ""; // The IP packet data (if there is no header)
 	private int traceID = 0; // The trace ID for the cell
+	public static int CELL_SIZE = 48*8; //the size of the data field of an ATM cell(in bits)
 	
 	/**
 	 * Constructor for an ATM cell when there is IP header data
