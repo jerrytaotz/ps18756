@@ -267,4 +267,19 @@ public class TestNet1 {
 		System.out.println("***SENDING ONE LAST SMALL PACKET***");
 		comp1.sendPacket(30);
 	}
+	
+	@Test
+	public void TestEPDIngress(){
+		System.out.println("***Test Net 1: Test EPD***");
+		
+		for(int i = 0; i< this.allConsumers.size();i++){
+			allConsumers.get(i).useEPD();
+		}
+		
+		comp1.setupConnection(13);
+		for(int i = 0;i<7;i++) tock();
+		for(int i = 0;i<18; i++){
+			comp1.sendPacket(700);
+		}
+	}
 }
