@@ -111,13 +111,12 @@ public class ATMNIC {
 		
 		//If the average is between the min and max thresh
 		if(REDMaxThresh>aveInt && REDMinThresh < aveInt){
-			//calculate the drop probability
-			dropProbability = (aveInt - (double)REDMinThresh)/
-			(double)(REDMaxThresh - REDMinThresh);
-			//Create a "die" to roll for this packet
-			sidesOfADie = (int)Math.rint(1.0/dropProbability);
-			System.out.println("Ave Queue Size: " + aveInt + " (in prob. drop zone).");
-			System.out.println("Drop Prob: 1/" + sidesOfADie);
+			//Create a "die" to roll for this packet.
+			//As ave. approaches REDMaxThresh, the die gets smaller.
+			sidesOfADie = (REDMaxThresh + 1) - (int)aveInt;
+			dropProbability = 1.0/(double)sidesOfADie;
+			System.out.println("(RED) Ave Queue Size: " + aveInt + " (in prob. drop zone).");
+			System.out.println("(RED) Drop Prob: " + dropProbability + " = 1/" + sidesOfADie);
 			//roll the die. Drop packet on a 1.
 			if((rnd.nextInt(sidesOfADie) + 1) == 1){
 				cellDropped = true;
@@ -128,7 +127,7 @@ public class ATMNIC {
 			}
 		}
 		else if(REDMaxThresh < aveInt){
-			System.out.println("Ave Queue Size: " + aveInt + " (> RED Max Threshold)");
+			System.out.println("(RED) Ave Queue Size: " + aveInt + " (> RED Max Threshold)");
 			//If this is an OAM cell we need to force it in by evicting some other cell
 			if(cell.getIsOAM()){
 				forceOAM(cell);
@@ -138,7 +137,7 @@ public class ATMNIC {
 				cellDropped = true;
 		}
 		else{
-			System.out.println("Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
+			System.out.println("(RED) Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
 			outputBuffer.add(cell);
 			//REDSumOfSizes += outputBuffer.size();
 		}
@@ -229,20 +228,18 @@ public class ATMNIC {
 	private void runEPD(ATMCell cell){
 		boolean cellDropped = false;
 		
-		/*//check if cell is OAM, if it is, let it through.
-		if(cell.getIsOAM()){
-			forceOAM(cell);
-		}*/
 		//if cell is not an IP header, check if packet is being dropped.
 		if(cell.getPacketData() == null){
 			//if so, drop it as long as it's not an OAM cell.
 			if(this.droppingAPacket && !cell.getIsOAM()) cellDropped = true;
 			//if not dropping, let it go through RED (which will also handle OAM).
-			cellDropped = !this.runRED(cell,false,true);
+			else cellDropped = !this.runRED(cell,false,true);
 		}
 		//if cell IS an IP header, we need to run a RED simulation on it.
 		else{
+			System.out.println("(EPD) Running RED simulation.");
 			cellDropped = !this.runREDSimulation(cell);
+			this.droppingAPacket = cellDropped;
 			if(cellDropped = false)
 				cellDropped = this.runRED(cell, false, true);
 		}		
@@ -261,7 +258,7 @@ public class ATMNIC {
 	 * @return true if the entire packet would make it through, false otherwise.
 	 */
 	private boolean runREDSimulation(ATMCell cell) {
-		boolean cellDropped = false,packetAdmitted = false;
+		boolean packetAdmitted = false;
 		int packetLen = 0,numCells = 0;
 		int sidesOfADie;
 		ArrayList<ATMCell> virtualOutputBuffer = (ArrayList<ATMCell>)this.outputBuffer.clone();
@@ -272,8 +269,8 @@ public class ATMNIC {
 		packetLen = cell.getPacketData().getSize();
 		//2. Divide the length across x ATM cells
 		numCells = packetLen/ATMCell.CELL_SIZE + 1;
-		System.out.println("(REDSIM) A packet of length " + packetLen + " is divided across" + 
-				numCells + " cells.");
+		System.out.println("(REDSIM) A packet of length " + packetLen + " = " + 
+				numCells + " ATM cells.");
 
 		//3. Run RED simulation using a virtual buffer and virtual counter for each cell
 		for(int i = 0;i<numCells;i++){
@@ -282,32 +279,35 @@ public class ATMNIC {
 			
 			//If the average is between the min and max thresh
 			if(REDMaxThresh>aveInt && REDMinThresh < aveInt){
-				//calculate the drop probability
-				dropProbability = (aveInt - (double)REDMinThresh)/
-				(double)(REDMaxThresh - REDMinThresh);
-				//Create a "die" to roll for this packet
-				sidesOfADie = (int)Math.rint(1.0/dropProbability);
+				//Create a "die" to roll for this packet.
+				//As ave. approaches REDMaxThresh, the die gets smaller.
+				sidesOfADie = (REDMaxThresh + 1) - (int)aveInt;
+				dropProbability = 1.0/(double)sidesOfADie;
+				
 				System.out.println("(REDSIM) Ave Queue Size: " + aveInt + " (in prob. drop zone).");
 				System.out.println("(REDSIM) Drop Prob: 1/" + sidesOfADie);
 				//roll the die. Drop packet on a 1.
 				if((rnd.nextInt(sidesOfADie) + 1) == 1){
-					cellDropped = true;
+					System.out.println("(REDSIM) Simulation detected a cell drop.");
+					return false;
 				}
 				else{
 					virtualOutputBuffer.add(cell);
 				}
 			}
 			else if(REDMaxThresh < aveInt){
-				cellDropped = true;
+				System.out.println("(REDSIM) Simulation detected a cell drop.");
+				return false;
 			}
 			else{
 				System.out.println("(REDSIM)Ave Queue Size: " + aveInt + " (< RED Min Threshold)");
 				virtualOutputBuffer.add(cell);
 			}
-			//Is the packet still good to go?
-			packetAdmitted = packetAdmitted || cellDropped;
 		}
-		//4. if ANY cell would be dropped, drop the entire packet
+		
+		//if we made it here, the packet is good to go.
+		System.out.println("(REDSIM) Packet passed RED simulation.");
+		packetAdmitted = true;
 		return packetAdmitted;
 	}
 

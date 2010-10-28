@@ -268,6 +268,12 @@ public class TestNet1 {
 		comp1.sendPacket(30);
 	}
 	
+	/**
+	 * Tests whether or not EPD drops an IP packet in its entirety after an
+	 * RED simulation detects that a cell might be dropped.  Does this by sending
+	 * several large packets into a NIC.  You should check if the packet is discarded
+	 * in the output.
+	 */
 	@Test
 	public void TestEPDIngress(){
 		System.out.println("***Test Net 1: Test EPD***");
@@ -276,10 +282,18 @@ public class TestNet1 {
 			allConsumers.get(i).useEPD();
 		}
 		
+		System.out.println("***ESTABLISHING A CONNECTION TO 13***");
 		comp1.setupConnection(13);
-		for(int i = 0;i<7;i++) tock();
-		for(int i = 0;i<18; i++){
-			comp1.sendPacket(700);
+		for(int i = 0;i<10;i++) tock();
+		System.out.println("***SENDING 30 IP PACKETS OVER 180 ATM CELLS***");
+		for(int i = 0;i<30; i++){
+			comp1.sendPacket(2000); //Each should be divided over 5 cells
 		}
+		System.out.println("***SENDING AN OAM SIGNAL***");
+		comp1.endConnection();
+		for(int i = 0;i<10;i++){
+			tock();//The end signal should be processed by the network.
+		}
+		
 	}
 }
