@@ -47,9 +47,10 @@ public class Computer implements IATMCellConsumer{
 	}
 
 	/**
-	 * TODO fill in the method comments
-	 * @param cell
-	 * @param nic2
+	 * Parse a cell containing an OAM signal and forward control to the appropriate
+	 * processing method.
+	 * @param cell the cell containing the OAM signal
+	 * @param nic2 the nic on which the cell was received.
 	 */
 	private void processOAMSignal(ATMCell cell, ATMNIC nic2) {
 		String cellData = cell.getData();
@@ -58,6 +59,10 @@ public class Computer implements IATMCellConsumer{
 		if(cellData.contains("call proceeding")){
 			this.receivedCallProceeding(cell);
 		}
+		if(cellData.contains("end")){
+			if(cellData.contains("ack")) this.receivedEndAck(cell);
+		}
+		if(cellData.contains("wait")) this.receivedWait(cell);
 		if(cellData.contains("connect")){
 			this.receivedConnect(cell);
 			//print that the VC was set up.
