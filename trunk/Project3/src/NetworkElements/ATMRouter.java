@@ -189,15 +189,15 @@ public class ATMRouter implements IATMCellConsumer{
 	 * valid values for signal:
 	 * "call proceeding"
 	 * "setup <dest. address>"
+	 * "setup ack
 	 * "wait"
 	 * "connect <vc number>"
 	 * "connect ack"
 	 * "end <vc number>"
 	 * "end ack"
 	 * @param oldCell - the cell which this signal is being sent in response to
-	 * @remarks if the value of signal is not on the list above, a packet 
-	 * will still be sent to nic, it will just need to be dealt with on
-	 * the receiving end as a bad signal.
+	 * @remarks if the value of signal is not on the list above, the router will 
+	 * drop the cell.
 	 */
 	private void sendSignal(ATMNIC nic, String signal, ATMCell oldCell){
 		//Create the cell to send
@@ -303,6 +303,7 @@ public class ATMRouter implements IATMCellConsumer{
 	
 	/**
 	 * calculates the next available output VC.  Uses a linear scan over the values in the VCtoVC map.
+	 * @param nic the nic for which the outgoing VC is being calculated.
 	 * @return the endpoint VC if one can be found. -1 if all integers are already in use.
 	 */
 	private int calcOutVC(ATMNIC nic) {
@@ -315,18 +316,20 @@ public class ATMRouter implements IATMCellConsumer{
 	}
 
 	/**
-	 * Processes the "call proceeding" signal.
+	 * Processes the "call proceeding" signal.  Just prints confirmation to console.
 	 * @param cell
 	 */
 	private void processCallProceeding(ATMCell cell){
-		//TODO:implement this method, I don't think it really needs to do much
 		receivedCallProceeding(cell);
 	}
 	
 	/**
-	 * TODO fill in the comments for this method
-	 * @param cell
-	 * @param nic
+	 * Processes the connect signal.  First searches the ATM lookup table 
+	 * for the proposed VC.  If the proposed VC is found, a new VC is mapped
+	 * onto the proposed VC.  Once the VC mapping is established, a connect
+	 * ack is sent back upstream and a new connect message is sent downstream.
+	 * @param cell the cell containing the connect signal
+	 * @param nic the nic from which this signal was received
 	 */
 	private void processConnect(ATMCell cell, ATMNIC nic){
 		String cellData = cell.getData();
@@ -359,9 +362,11 @@ public class ATMRouter implements IATMCellConsumer{
 	}
 	
 	/**
-	 * 
-	 * @param cell
-	 * @param nic
+	 * Process the wait signal.  Receiving the wait signal means that a router
+	 * on the path to the destination is busy setting up another connection.  
+	 * Just resends the setup request ad infinitum until a setup ack is received.
+	 * @param cell - the cell carrying the wait signal
+	 * @param nic - the nic on which the wait signal was received
 	 */
 	private void processWait(ATMCell cell, ATMNIC nic){
 		String cellData;
@@ -405,6 +410,8 @@ public class ATMRouter implements IATMCellConsumer{
 		int endVC = getIntFromEndOfString(cellData);
 		int outVC; //The VC which endVC is mapped to (if any)
 		NICVCPair outPair; //The outgoing NIC/VC pairing (if it exists)
+		
+		this.recieveEnd(cell);
 		
 		//error checking
 		if(endVC < 0){
@@ -582,12 +589,10 @@ public class ATMRouter implements IATMCellConsumer{
 	 * @since 1.0
 	 */
 	private void receivedConnect(ATMCell cell){
-int VCNum = getIntFromEndOfString(cell.getData());
-		
-		//TODO remove the VC in parens below before submission.
+
 		if(this.displayCommands)
 		System.out.println("REC CONN: Router " +this.address+ 
-				" received a connect message " + "(" + VCNum + ") " + cell.getTraceID());
+				" received a connect message " + cell.getTraceID());
 	}
 	
 	/**

@@ -188,7 +188,7 @@ public class TestNet2 {
 
 	@Test
 	public void TestNet2Test1(){
-		System.out.println("**Test Net 2 Test 1 **");
+		System.out.println("**Test Net 2: Test Connectivity **");
 		
 		// Setup a connection from comp1 to router 7
 		tock();
@@ -205,10 +205,67 @@ public class TestNet2 {
 	}
 	
 	/**
-	 * A test to make sure tail drop works in this second network.
+	 * A test to ensure that the end message works the way its supposed to.
+	 * Connections are established as they are in Test 1 and then the 'end'
+	 * signal is sent across each connection.  All connections should
+	 * be torn down.
 	 */
 	@Test
-	public void TestNet2TestTailDrop(){
+	public void TestNet2TestEndNormal(){
+		System.out.println("***Test Net 2: Testing the 'end' signal.***");
+		// Setup a connection from comp1 to router 7
+		tock();
+		comp1.setupConnection(7);
+		comp4.setupConnection(2);
+		//comp4 should get VC 1
+		//comp1 should get VC 1
+		for(int i=0; i<12; i++)
+			this.tock();
+		comp3.setupConnection(5);
+		//comp3 should get VC 2
+		for(int i = 0; i<5; i++)
+			this.tock();
+		//Comp2 should get VC 3
+		comp2.setupConnection(7);
+		for(int i = 0; i<11; i++)
+			this.tock();
+		System.out.println("***TEARING ALL ROUTES DOWN***");
+		comp1.endConnection();
+		comp2.endConnection();
+		comp3.endConnection();
+		comp4.endConnection();
+		for(int i = 0; i<9;i++) tock();
+	}
+	
+	/**
+	 * This test tries to tear down a connection before it has been set up.
+	 * comp1 starts to set up a connection, lets the 'setup' signal get half way
+	 * and then sends an end message.  The first router (r1) should deny the message.
+	 */
+	@Test
+	public void TestNet2TestEndNoVC(){
+		System.out.println("**Test Net 2: Testing 'end' signal with no VC.");
+		comp1.endConnection(); //this should fail.
+		comp1.setupConnection(7);
+		tock();
+		tock();
+		comp1.endConnection();//this too
+		tock();
+		comp1.endConnection();//and this
+		for(int i = 0; i < 6;i++) tock();
+		comp1.endConnection();//this should go through
+		for(int i =0;i<10;i++) tock();
+		comp1.sendPacket(5);
+		tock();
+	}
+	
+	/**
+	 * A test to make sure tail drop works in this second network.
+	 * Overloads comp1's NIC to see if the packets exceeding the threshold
+	 * are actually dropped.
+	 */
+	@Test
+	public void TestNet2TestTailDropIngress(){
 		// Setup a connection from comp1 to router 7
 		System.out.println("**Test Net 2: Test Tail Drop**");
 		tock();
@@ -224,11 +281,42 @@ public class TestNet2 {
 	}
 	
 	/**
-	 * A test to make sure RED works in this second network.
+	 * Tests tail drop on an intermediate router to ensure that packets
+	 * are actually dropped.  Does this by bombarding router 5 with packets.
+	 */
+	@Test 
+	public void TestTailDropIntermediate(){
+		System.out.println("***TEST NET 2: TEST TAIL DROP ON INT. ROUTER***");
+		comp1.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		comp4.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		for(int i = 0;i<20;i++){
+			comp1.sendPacket(5);
+		}
+		tock();
+		for(int i = 0;i<5;i++){
+			comp4.sendPacket(5);
+		}
+		tock();
+		tock();//5 packets should be dropped by router 5.
+	}
+	
+	/**
+	 * A test to make sure RED works in this second network.  It sets up a connection
+	 * between computer2 and router 6 and then overloads computer 2's NIC with packets.
+	 * Comp2's NIC should start dropping packets probabilistically after a while.
+	 * It should also drop all packets once the RED threshold is reached.  It then
+	 * clears the NIC and overloads the NIC again just to make sure everything clears out
+	 * and works properly after a buffer flush.
 	 */
 	@Test
-	public void TestNet2TestRED(){
-		// Setup a connection from comp1 to router 7
+	public void TestNet2TestREDIngress(){
+		// Setup a connection from comp2 to router 6
 		System.out.println("**Test Net 2: Test RED**");
 		
 		for(int i = 0; i<this.allConsumers.size();i++){
@@ -236,15 +324,134 @@ public class TestNet2 {
 		}
 		tock();
 		//Setup a connection just to test RED in presence of other traffic.
+		System.out.println("***SETTING UP CONNECTION BETW. COMP2 AND R6***");
 		comp2.setupConnection(6);
-		for(int i=0; i<3; i++)
+		for(int i=0; i<8; i++)
 			this.tock();
+		System.out.println("***SENDING 30 PACKETS***");
 		for(int i = 0;i<30;i++)
-			comp1.sendPacket(5);
+			comp2.sendPacket(5);
 		this.tock();
-		for(int i = 0; i<50; i++)
-			comp1.sendPacket(5);
+		System.out.println("***SENDING ANOTHER 30***");
+		for(int i = 0; i<30; i++)
+			comp2.sendPacket(5);
 		
 	}
 	
+	/**
+	 * Tests RED at an intermediate router.  Does this by overwhelming router
+	 * 5 with packets from both router 6 and router 3.
+	 */
+	@Test
+	public void TestREDIntermediate(){
+		System.out.println("***TEST NET 2: TEST RED ON INT. ROUTER***");
+		for(int i = 0;i<this.allConsumers.size();i++){
+			allConsumers.get(i).useRED();
+		}
+		
+		comp1.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		comp4.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		for(int i = 0;i<20;i++){
+			comp1.sendPacket(5);
+		}
+		tock();
+		for(int i = 0;i<20;i++){
+			comp4.sendPacket(5);
+		}
+		tock();
+		tock();
+	}
+	
+	/**
+	 * Tests PPD at an ingress router.
+	 */
+	@Test public void TestPPDIngress(){
+		System.out.println("***TEST NET 2: TEST PPD ON INGRESS ROUTER***");
+		for(int i = 0;i<this.allConsumers.size();i++){
+			allConsumers.get(i).usePPD();
+		}
+		comp1.setupConnection(3);
+		for(int i = 0;i<6;i++){
+			tock();
+		}
+		comp1.sendPacket(20000);
+	}
+	
+	/**
+	 * Tests PPD at an intermediate router.  Does this by overwhelming router
+	 * 5 with packets from both router 6 and router 3.
+	 */
+	@Test
+	public void TestPPDIntermediate(){
+		System.out.println("***TEST NET 2: TEST PPD ON INT. ROUTER***");
+		for(int i = 0;i<this.allConsumers.size();i++){
+			allConsumers.get(i).usePPD();
+		}
+		
+		comp1.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		comp4.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		for(int i = 0;i<30;i++){
+			comp1.sendPacket(5);
+		}
+		tock();
+		comp4.sendPacket(6000);//Make sure once first cell is dropped, no more get through.
+		tock();
+		tock();
+	}
+	
+	/**
+	 * Tests EPD at an ingress router.
+	 */
+	@Test public void TestEPDIngress(){
+		System.out.println("***TEST NET 2: TEST EPD ON INGRESS ROUTER***");
+		for(int i = 0;i<this.allConsumers.size();i++){
+			allConsumers.get(i).useEPD();
+		}
+		comp1.setupConnection(3);
+		for(int i = 0;i<6;i++){
+			tock();
+		}
+		comp1.sendPacket(20000); //This packet should (with high p) get entirely dropped.
+	}
+	
+	/**
+	 * Tests EPD at an intermediate router.  Does this by overwhelming router
+	 * 5 with packets from both router 6 and router 3.
+	 */
+	@Test
+	public void TestEPDIntermediate(){
+		System.out.println("***TEST NET 2: TEST EPD ON INT. ROUTER***");
+		for(int i = 0;i<this.allConsumers.size();i++){
+			allConsumers.get(i).useEPD();
+		}
+		
+		comp1.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		comp4.setupConnection(7);
+		for(int i = 0;i<12;i++){
+			tock();
+		}
+		for(int i = 0;i<30;i++){
+			comp1.sendPacket(5);
+		}
+		tock();
+		comp4.sendPacket(12000);//Make sure once first cell is dropped, no more get through.
+		tock();
+		tock();
+	}
+
 }
