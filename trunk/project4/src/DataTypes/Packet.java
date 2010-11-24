@@ -2,11 +2,15 @@ package DataTypes;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Random;
 
 public class Packet {
 	private int source, dest, DSCP; // The source and destination addresses
-	private boolean OAM = false;
+	private int id;
+	protected boolean RSVP = false; //is this an RSVP packet?
 	private Queue<MPLS> MPLSheader = new LinkedList<MPLS>(); // all of the MPLS headers in this router
+	protected String type;
+	private Random rand;
 	
 	/**
 	 * The default constructor for a packet
@@ -20,10 +24,23 @@ public class Packet {
 			this.source = source;
 			this.dest = dest;
 			this.DSCP = DSCP;
+			rand = new Random();
+			id = rand.nextInt(100);
 		}
 		catch(Exception e){
 			e.printStackTrace();
 		}
+	}
+	
+	public String getType(){
+		return type;
+	}
+	
+	/**
+	 * Return whether or not this packet is an RSVP packet
+	 */
+	public boolean isRSVP(){
+		return RSVP;
 	}
 	
 	/**
@@ -76,6 +93,67 @@ public class Packet {
 	 */
 	public int getDSCP() {
 		return this.DSCP;
+	}
+	
+	/**
+	 * returns the packet ID associated with this packet.
+	 * @return
+	 */
+	public int getID(){
+		return this.id;
+	}
+	
+	/**
+	 * Classifies DSCPs as PHBs.  Useful for placing things in the right queue.
+	 * If the current DSCP is not a defined DSCP, this returns -1.
+	 * @return the PHB corresponding to the DSCP of this packet. -1 if the current 
+	 * DSCP is not valid.
+	 */
+	public int classifyDSCP(){
+		if(this.DSCP == 46) return Constants.PHB_EF;
+		else if(this.DSCP >= 11 && this.DSCP <= 43){
+			return Constants.PHB_AF;
+		}
+		else if(this.DSCP == 0) return Constants.PHB_BE;
+		else return -1;
+	}
+	
+	/**
+	 * Get the AF class of this packet.  If this packet is not an AF
+	 * stream, this method will return -1.  
+	 * TODO: this is sloppy.  Come back and see if you can do some bit
+	 * manipulations if you have time.
+	 * @return the AF class if this an AF packet.  If not, return -1.
+	 */
+	public int getAFClass(){
+		switch(this.DSCP){
+		case Constants.DSCP_AF11:
+			return 1;
+		case Constants.DSCP_AF21:
+			return 2;
+		case Constants.DSCP_AF31:
+			return 3;
+		case Constants.DSCP_AF41:
+			return 4;
+		case Constants.DSCP_AF12:
+			return 1;
+		case Constants.DSCP_AF22:
+			return 2;
+		case Constants.DSCP_AF32:
+			return 3;
+		case Constants.DSCP_AF42:
+			return 4;
+		case Constants.DSCP_AF13:
+			return 1;
+		case Constants.DSCP_AF23:
+			return 2;
+		case Constants.DSCP_AF33:
+			return 3;
+		case Constants.DSCP_AF43:
+			return 4;
+		default:
+			return -1;
+		}
 	}
 }
 	

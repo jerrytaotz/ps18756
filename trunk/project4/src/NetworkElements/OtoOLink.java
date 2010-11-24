@@ -30,7 +30,7 @@ public class OtoOLink {
 	public void updateNetworkMap(DirectedGraph map){
 		LSR lsr1 = r1NIC.getParent();
 		LSR lsr2 = r2NIC.getParent();
-		float linkCost = 1/(float)r1NIC.getAvailableLineRate();
+		float linkCost = 1/(float)r1NIC.getAvailableBW();
 
 		//Update the network map to reflect this new link.
 		Node node1;
@@ -70,5 +70,15 @@ public class OtoOLink {
 		}
 		else
 			System.err.println("(OtoOLink) Error: You are trying to send a packet down a link that you are not connected to");
+	}
+	
+	/**
+	 * Returns the address of the node on the opposite end of the link from a caller.
+	 * @param the calling node.
+	 * @return the address of the node on the opposite end of the link from the caller.
+	 */
+	public int getNeighborAddress(LSRNIC caller){
+		if(caller == r1NIC) return r2NIC.getParent().getAddress();
+		else return r1NIC.getParent().getAddress();
 	}
 }
