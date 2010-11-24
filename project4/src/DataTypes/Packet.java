@@ -5,7 +5,8 @@ import java.util.Queue;
 import java.util.Random;
 
 public class Packet {
-	private int source, dest, DSCP; // The source and destination addresses
+	protected int source; // The source and destination addresses
+	protected int dest, DSCP;
 	private int id;
 	protected boolean RSVP = false; //is this an RSVP packet?
 	private Queue<MPLS> MPLSheader = new LinkedList<MPLS>(); // all of the MPLS headers in this router
@@ -101,6 +102,14 @@ public class Packet {
 	 */
 	public int getID(){
 		return this.id;
+	}
+	
+	/**
+	 * Set the ID of this packet.
+	 * @param newID the new ID of this packet
+	 */
+	public void setID(int newID){
+		this.id = newID;
 	}
 	
 	/**
