@@ -13,19 +13,27 @@ public class TestNet1 {
 
 	private DirectedGraph map;
 	private ArrayList<LSR> allConsumers;
+	private int time;
+	private LSR r1;
+	private LSR r2;
+	private LSR r3;
+	private LSR r4;
+	private LSR r5;
+	private LSR r6;
 	
 	@Before
 	public void setUp() throws Exception {
 		map = new DirectedGraph();
 		allConsumers = new ArrayList<LSR>();
+		time = 0;
 		
 		//Create new machines
-		LSR r1 = new LSR(1);
-		LSR r2 = new LSR(2);
-		LSR r3 = new LSR(3);
-		LSR r4 = new LSR(4);
-		LSR r5 = new LSR(5);
-		LSR r6 = new LSR(6);
+		r1 = new LSR(1);
+		r2 = new LSR(2);
+		r3 = new LSR(3);
+		r4 = new LSR(4);
+		r5 = new LSR(5);
+		r6 = new LSR(6);
 		
 		//Give them NICS
 		LSRNIC r1r2 = new LSRNIC(r1);
@@ -77,10 +85,35 @@ public class TestNet1 {
 	public void tearDown() throws Exception {
 	}
 
+	public void tock(){
+		System.out.println("** TIME = " + time + " **");
+		time++;
+		
+		
+		// Send packets between routers
+		for(int i=0; i<this.allConsumers.size(); i++)
+			allConsumers.get(i).sendPackets();
+
+		// Move packets from input buffers to output buffers
+		for(int i=0; i<this.allConsumers.size(); i++)
+			allConsumers.get(i).recievePackets();
+		
+	}
+	
 	@Test
 	public void testRoutingTableSetup(){
 		for(LSR r: allConsumers){
 			r.printRoutingTable();
+		}
+	}
+	
+	@Test public void testPATHReceipt(){
+		r1.allocateBandwidth(4, Constants.PHB_BE, 0, 0);
+		r1.allocateBandwidth(3, Constants.PHB_AF, 2, 10);
+		r1.allocateBandwidth(6, Constants.PHB_EF, 0, 20);
+		r6.allocateBandwidth(1, Constants.PHB_BE, 0, 0);
+		for(int i = 0;i<20;i++){
+			tock();
 		}
 	}
 }

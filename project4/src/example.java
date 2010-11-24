@@ -70,7 +70,9 @@ public class example {
 		r1.createPacket(13, 0);
 		r1.createPacket(14, 0);
 		
-		tock();
+		for(int i=0;i<15;i++){
+			tock();
+		}
 	}
 	
 	public void tock(){
