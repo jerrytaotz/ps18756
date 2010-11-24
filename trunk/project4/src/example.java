@@ -59,9 +59,9 @@ public class example {
 		this.allConsumers.add(r4);
 		this.allConsumers.add(r5);
 		
-		for(LSR r:allConsumers){
+		/*for(LSR r:allConsumers){
 			r.printRoutingTable();
-		}
+		}*/
 		
 		//send packets from router 1 to the other routers...
 		r1.createPacket(11, 0);

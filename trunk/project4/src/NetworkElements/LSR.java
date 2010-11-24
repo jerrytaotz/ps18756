@@ -87,11 +87,12 @@ public class LSR{
 	 * @since 1.0
 	 */
 	public void allocateBandwidth(int dest, int PHB, int Class, int Bandwidth){
-		PATHMsg pathMsg = new PATHMsg(this.address,dest,PHB,Class);
+		PATHMsg pathMsg = new PATHMsg(this.address,dest,PHB,Class,Bandwidth);
 
 		//Place this message in the output buffer
+		sentPATH(pathMsg);
 		pathMsg.addPrevHop(this.address);
-		this.routingTable.get(dest).receivePacket(pathMsg);	
+		this.routingTable.get(dest).sendPacket(pathMsg,this);	
 	}
 
 	/**
@@ -148,6 +149,20 @@ public class LSR{
 	}
 
 	/**
+	 * calculates the next available input label.  Uses a linear scan over the values in the labelTable.
+	 * @return the output label if one can be found. -1 if all integers are already in use.
+	 */
+	private int calcInLabel() {
+		//find the next available input label
+		for(int i = 1;i < Integer.MAX_VALUE;i++){
+			if(!labelTable.containsKey(i)){
+				return i;
+			}
+		}
+		return -1;
+	}
+	
+	/**
 	 * Updates the routing tables in this router using
 	 * Dijkstra's algorithm.
 	 * @param map the network map to use.  This simulates receiving
@@ -174,24 +189,65 @@ public class LSR{
 	/**
 	 * determines which router to forward this request to and
 	 * pushes the address of this router onto the message's previous hops.
-	 * @param p
+	 * @param p the packet containing the PATH message
 	 */
 	private void processPATH(PATHMsg p){
 		LSRNIC forwardNIC;
+		PATHMsg fwdPATH;
+		RESVMsg resv;
+		int inLabel,nextHop;
 
 		if(p.getDest() == this.address){
-			System.out.println("(Router " + this.address + "): terminated PATH msg "
-					+ p.getID() + " from router " + p.getSource());
+			/*setup a label mapping to null to indicate this is the receiving node*/
+			inLabel = calcInLabel();
+			if(inLabel > 0) labelTable.put(inLabel, null);
+			/*send back a reservation message*/
+			System.out.println("(Router " + this.address + "): Terminated PATH msg. Established MPLS label " 
+					+ inLabel + " to router " + p.getSource());
+			resv = new RESVMsg(this.address,p.getSource(),p.getPHB(),p.gettClass(),
+					p.getTspec(),(ArrayList<Integer>)p.getPrevHops().clone());
+			forwardNIC = routingTable.get(resv.getNextHop());
+			forwardNIC.sendPacket(resv, this);
 		}
 		else{ 
 			receivedPATH(p); //print a message
-			p.addPrevHop(this.address);
-			forwardNIC = routingTable.get(p.getDest());
-			this.sentPATH(p);
-			forwardNIC.sendPacket(p, this);
+			fwdPATH = p.Clone();
+			fwdPATH.addPrevHop(this.address);
+			forwardNIC = routingTable.get(fwdPATH.getDest());
+			this.sentPATH(fwdPATH); //print a message
+			forwardNIC.sendPacket(fwdPATH, this);
 		}
 	}
 
+	/**
+	 * Processes a reserve message.  Checks reservation request against available
+	 * resources.  If resources are available to fulfill the request, they are reserved
+	 * and the RESV message is forwarded (unless this router is the destination). If
+	 * sufficient resources are not available, a RESVERR message is forwarded back to 
+	 * the sender.
+	 * @param p the packet containing the RESV message.
+	 */
+	private void processRESV(RESVMsg p){
+		LSRNIC forwardNIC;
+		RESVMsg forwardRESV;
+		
+		if(p.getDest() == this.address){
+			//set up label mapping
+			//forward all waiting packets
+			System.out.println("(Router " + this.address + "): Terminated RESV msg "
+					+ p.getID() + " from router " + p.getSource());
+		}
+		else{
+			receivedRESV(p);
+			//check resources 
+			//forward packet
+			forwardRESV = p.Clone();
+			forwardNIC = routingTable.get(forwardRESV.getNextHop());
+			this.sentRESV(forwardRESV);
+			forwardNIC.sendPacket(forwardRESV, this);
+		}
+	}
+	
 	/**
 	 * Determines what type of RSVP packet p is and hands control 
 	 * off to the appropriate processing method.
@@ -202,7 +258,9 @@ public class LSR{
 		if(pType.compareTo("PATH") == 0){
 			processPATH((PATHMsg)p);
 		}
-
+		else if(pType.compareTo("RESV") == 0){
+			processRESV((RESVMsg)p);
+		}
 	}
 
 	/**
@@ -214,11 +272,11 @@ public class LSR{
 	}
 
 	/**
-	 * prints when a router receives a PATH msg.
+	 * prints when a router receives/sends a PATH msg.
 	 */
 	private void receivedPATH(PATHMsg p){
 		System.out.println("(Router " + this.address +"): received PATH message " 
-				+ p.getID() + " from " + p.getSource());
+				+ p.getID() + " {src: " + p.getSource() + ", dest: " +p.getDest()+"}");
 	}
 
 	private void sentPATH(PATHMsg p){
@@ -226,6 +284,19 @@ public class LSR{
 				+ p.getID());
 	}
 
+	/**
+	 * prints when a router receives/sends a RESV msg.
+	 */
+	private void receivedRESV(RESVMsg p){
+		System.out.println("(Router " + this.address +"): received RESV message " 
+				+ p.getID() + " {src: " + p.getSource() + ", dest: " +p.getDest()+"}");
+	}
+
+	private void sentRESV(RESVMsg p){
+		System.out.println("(Router " + this.address +"): sent a RESV message: " 
+				+ p.getID());
+	}
+	
 	/**
 	 * Prints a quick summary of the routing table.
 	 */
