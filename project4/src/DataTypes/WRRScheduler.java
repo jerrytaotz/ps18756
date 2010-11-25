@@ -14,6 +14,12 @@ import NetworkElements.LSRNIC;
 
 public class WRRScheduler {
 	
+	LSRNIC parent;
+	
+	public WRRScheduler(LSRNIC parent){
+		this.parent = parent;
+	}
+	
 	/**
 	 * The main scheduling algorithm for the DiffServ enabled LSR.  Meets EF contract by meeting
 	 * each of the required EF requirements:
@@ -33,6 +39,7 @@ public class WRRScheduler {
 		int yield = 0; //Unused bandwidth counter
 		int extra = 0;
 		int numToSend = 0,tempToSend = 0;
+		Packet nextP;
 		FIFOQueue nextQueue;
 		
 		/*find the total unused bandwidth*/
@@ -43,14 +50,18 @@ public class WRRScheduler {
 		
 		/*service EF queue*/
 		nextQueue = DSQueues.get(LSRNIC.EF);
+		nextQueue.incrementDelays();
 		numToSend = Math.min(nextQueue.getWeight(), nextQueue.getNumPackets());
 		for(int i = 0;i<numToSend;i++){
-			outBuf.add(nextQueue.remove());
+			nextP = nextQueue.remove();
+			outBuf.add(nextP);
 		}
 		
 		/*service the remaining queues*/
 		for(int i = LSRNIC.AF1;i<DSQueues.size();i++){
 			nextQueue = DSQueues.get(i);
+			nextQueue.incrementDelays();
+			
 			numToSend = Math.min(nextQueue.getWeight(),nextQueue.getNumPackets());
 			/*find out if this queue needs extra bandwidth*/
 			if(nextQueue.getNumPackets() > nextQueue.getWeight()){
@@ -65,8 +76,15 @@ public class WRRScheduler {
 			}
 			/*send the packets*/
 			for(int j = 0;j < numToSend; j++){
-				outBuf.add(nextQueue.remove());
+				nextP = nextQueue.remove();
+				outBuf.add(nextP);
 			}
 		}
+	}
+	
+	public void sentData(Packet p){
+		int address = parent.getParent().getAddress();
+		System.out.println("DATA: Router " + address + "): Transmitted data to " + p.getDest() 
+				+ ": " + p.getID());
 	}
 }

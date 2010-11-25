@@ -62,6 +62,31 @@ public class FIFOQueue{
 		else return null;
 	}
 	
+	/**
+	 * increase the current WRR weight by 'inc'
+	 * @param inc the amount to increase this queue's weight by.
+	 */
+	public void increaseWeight(int inc){
+		weight += inc;
+	}
+	
+	/**
+	 * increment the delay on every packet in this queue.
+	 */
+	public void incrementDelays(){
+		for(Packet p:packets){
+			p.incrementDelay();
+		}
+	}
+	
+	/**
+	 * decrease the current WRR weight by 'dec'
+	 * @param inc
+	 */
+	public void decreaseWeight(int dec){
+		weight -= dec;
+	}
+	
 	public int getLowREDThresh(){
 		return lowREDThresh;
 	}
@@ -69,4 +94,5 @@ public class FIFOQueue{
 	public int getHighREDThresh(){
 		return highREDThresh;
 	}
+	
 }

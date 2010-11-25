@@ -116,4 +116,70 @@ public class TestNet1 {
 			tock();
 		}
 	}
+	
+	/**
+	 * Tests whether a single router can reserve multiple flows over the same LSP.
+	 */
+	@Test
+	public void testRESV1(){
+		r4.allocateBandwidth(1, Constants.PHB_EF, 0, 20);
+		r4.allocateBandwidth(1, Constants.PHB_AF, 1, 5);
+		for(int i = 0;i<15;i++){
+			tock();
+		}
+	}
+	
+	/**
+	 * Tests whether a router can distinguish between LSR flows and create a new LSP for each of them.
+	 */
+	@Test
+	public void testRESV2(){
+		r4.allocateBandwidth(6, Constants.PHB_EF, 0, 10);
+		r5.allocateBandwidth(1, Constants.PHB_EF, 0, 10);
+		for(int i=0;i<10;i++){
+			tock();
+		}
+	}
+	
+	/**
+	 * Tests if routers will set up two unidirectional LSPs when they want two LSPs between each other
+	 */
+	@Test
+	public void testRESV3(){
+		r5.allocateBandwidth(1,Constants.PHB_EF,0,10);
+		r1.allocateBandwidth(5, Constants.PHB_EF, 0, 10);
+		r5.allocateBandwidth(1,Constants.PHB_AF,1,10);
+		r1.allocateBandwidth(5, Constants.PHB_AF, 2, 10);
+		for(int i=0;i<10;i++){
+			tock();
+		}
+	}
+	
+	/**
+	 * Tests if a data packet can get from source to destination over a reserved channel
+	 */
+	@Test
+	public void testDataTranser1(){
+		r1.allocateBandwidth(5, Constants.PHB_EF, 0, 10);
+		for(int i=0;i<10;i++){
+			tock();
+		}
+		for(int i=0;i<20;i++){
+			r1.createPacket(5, Constants.DSCP_EF);
+		}
+		for(int i=0;i<10;i++){
+			tock();
+		}
+	}
+	
+	/**
+	 * Test whether on-the-fly bandwidth reservation is working
+	 */
+	@Test
+	public void testDataTransfer2(){
+		r1.createPacket(5, Constants.DSCP_EF);
+		for(int i=0;i<10;i++){
+			tock();
+		}
+	}
 }
