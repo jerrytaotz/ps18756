@@ -14,7 +14,7 @@ public class LSRNIC {
 	private ArrayList<Packet> inputBuffer = new ArrayList<Packet>(); // Where packets are put between the parent and nic
 	private ArrayList<Packet> outputBuffer = new ArrayList<Packet>(); // Where packets are put to be sent
 	private ArrayList<FIFOQueue> DSQueues;
-	private WRRScheduler scheduler = new WRRScheduler();
+	private WRRScheduler scheduler;
 	
 	public final static int EF = 0;
 	public final static int AF1 = 1;
@@ -40,6 +40,7 @@ public class LSRNIC {
 		DSQueues.add(AF4,new FIFOQueue(0));
 		/*start off by giving the BE queue all the bandwidth*/
 		DSQueues.add(BE,new FIFOQueue(lineRate));
+		scheduler = new WRRScheduler(this);
 	}
 	
 	/**
@@ -64,6 +65,68 @@ public class LSRNIC {
 		/*determine which queue this packet needs to go to*/
 		DSQueue = DSQueues.get(classifyPacket(currentPacket));
 		this.runRED(currentPacket,DSQueue);
+	}
+	
+	/**
+	 * Will reserve the specified resources 
+	 * @param PHB
+	 * @param afClass
+	 * @param tspec
+	 * @return true if the reservation was successful
+	 * false if the reservation failed.
+	 */
+	public boolean reserveBW(int PHB,int afClass,int tspec){
+		/*are there enough resources to accomodate this request?*/
+		if(tspec > this.availableBW){
+			System.out.println("(Router " + parent.getAddress() + "): " +
+			"Cannot accomodate RESV request. {Requested: " + tspec + ",Available: " + availableBW +
+			"}");
+			return false;
+		}
+		
+		switch(PHB){
+		case Constants.PHB_EF:
+			DSQueues.get(EF).increaseWeight(tspec);
+			break;
+		case Constants.PHB_AF:
+			if(afClass == 1){
+				DSQueues.get(AF1).increaseWeight(tspec);
+				break;
+			}
+			else if(afClass == 2){
+				DSQueues.get(AF2).increaseWeight(tspec);
+				break;
+			}
+			else if(afClass == 3){
+				DSQueues.get(AF3).increaseWeight(tspec);
+				break;
+			}
+			else if(afClass == 4){
+				DSQueues.get(AF4).increaseWeight(tspec);
+				break;
+			}
+			else{
+				System.out.println("(Router " + parent.getAddress() + "): " +
+				"received an invalid PHB AF class.");
+				return false;
+			}
+		case Constants.PHB_BE:
+			/*do nothing.  BE doesn't get to reserve BW*/
+			System.out.println("(Router " + parent.getAddress() + "): " +
+					"Fulfilled RESV request. {Requested: " + tspec + ",Now Available: " + availableBW +
+					"}");
+			return true;
+		default:
+			System.out.println("(Router " + parent.getAddress() + "): " +
+					"received an invalid PHB.");
+		}
+		/*siphon off the BW from the BE class and update the available BW*/
+		DSQueues.get(BE).decreaseWeight(tspec);
+		availableBW -= tspec;
+		System.out.println("(Router " + parent.getAddress() + "): " +
+				"Fulfilled RESV request. {Requested: " + tspec + ",Now Available: " + availableBW +
+				"}");
+		return true;
 	}
 	
 	/**

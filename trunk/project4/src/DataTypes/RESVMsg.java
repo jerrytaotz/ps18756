@@ -3,7 +3,7 @@ package DataTypes;
 import java.util.ArrayList;
 
 public class RESVMsg extends rsvpPacket {
-	int tspec, PHB, tClass;	
+	int tspec, PHB, tClass, label;	
 	ArrayList<Integer> prevHops; //So RESV messages come back on the same route
 	
 	/**
@@ -23,6 +23,7 @@ public class RESVMsg extends rsvpPacket {
 		this.PHB = PHB;
 		this.tClass = tClass;
 		this.tspec = tspec;
+		this.label = 0;
 	}
 	
 	/**
@@ -57,10 +58,28 @@ public class RESVMsg extends rsvpPacket {
 		return this.prevHops.remove(0);
 	}
 	
+	/**
+	 * Set the MPLS label in this message.  This will be the label used by a next
+	 * hop router when forwarding this message back to the traffic source.
+	 * @param label the new label to use.
+	 */
+	public void setLabel(int label){
+		this.label = label;
+	}
+	
+	/**
+	 * Return the MPLS label in this RESV message
+	 * @return
+	 */
+	public int getLabel(){
+		return this.label;
+	}
+	
 	public RESVMsg Clone(){
 		RESVMsg clone = new RESVMsg(this.source,this.dest,this.PHB,this.tClass,
 				this.tspec, (ArrayList<Integer>)this.prevHops.clone());
 		clone.setID(this.getID());
+		clone.setLabel(this.label);
 		return clone;
 	}
 }

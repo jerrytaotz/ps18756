@@ -8,6 +8,7 @@ public class Packet {
 	protected int source; // The source and destination addresses
 	protected int dest, DSCP;
 	private int id;
+	private int delay;
 	protected boolean RSVP = false; //is this an RSVP packet?
 	private Queue<MPLS> MPLSheader = new LinkedList<MPLS>(); // all of the MPLS headers in this router
 	protected String type;
@@ -26,7 +27,8 @@ public class Packet {
 			this.dest = dest;
 			this.DSCP = DSCP;
 			rand = new Random();
-			id = rand.nextInt(100);
+			delay = 0;
+			id = rand.nextInt(1000);
 		}
 		catch(Exception e){
 			e.printStackTrace();
@@ -125,6 +127,21 @@ public class Packet {
 		}
 		else if(this.DSCP == 0) return Constants.PHB_BE;
 		else return -1;
+	}
+	
+	/**
+	 * increments the delay on this packet by 1.
+	 */
+	public void incrementDelay(){
+		delay++;
+	}
+	
+	/**
+	 * determine the total delay this packet has experienced in the network so far.
+	 * @return the delay on this packet.
+	 */
+	public int getDelay(){
+		return delay;
 	}
 	
 	/**
