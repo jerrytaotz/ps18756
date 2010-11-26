@@ -15,8 +15,6 @@ public class LSR{
 	//private TreeMap<Integer, NICLabelPair> labelTable; // a map of input label to output nic and label
 	private ArrayList<Packet> waitingPackets;
 	private QoSMonitor monitor = null;
-
-	//TODO: Write a smoother
 	
 	/**
 	 * The default constructor for an ATM router
@@ -92,11 +90,15 @@ public class LSR{
 	 */
 	public void allocateBandwidth(int dest, int PHB, int Class, int Bandwidth){
 		PATHMsg pathMsg = new PATHMsg(this.address,dest,PHB,Class,Bandwidth);
-
+		LSRNIC forwardNIC;
+		
 		//Place this message in the output buffer
 		sentPATH(pathMsg);
 		pathMsg.addPrevHop(this.address);
-		this.routingTable.get(dest).sendPacket(pathMsg,this);	
+		forwardNIC = this.routingTable.get(dest);
+		if(forwardNIC != null) forwardNIC.sendPacket(pathMsg,this);	
+		else System.out.println("Router " + this.address + " tried to reserve bandwidth to address " +
+				dest + " which is not in its routing table.");
 	}
 
 	/**
@@ -149,7 +151,7 @@ public class LSR{
 	}
 	
 	/**
-	 * Clear out any packets that may have been waiting on an LSP
+	 * Clear out any packets that may have been waiting on an LSP setup
 	 * @param resv the resv message which triggered the release
 	 */
 	private void sendWaitingPackets(RESVMsg resv){
@@ -375,6 +377,7 @@ public class LSR{
 			return false;
 		}
 	}
+	
 	/**
 	 * Determines what type of RSVP packet p is and hands control 
 	 * off to the appropriate processing method.
@@ -394,6 +397,11 @@ public class LSR{
 		}
 	}
 
+	/**
+	 * Process a reservation confirmation.  Either hold on to it or forward it.
+	 * @param p the RESVCONF msg.
+	 * @param nic the nic it was received from
+	 */
 	private void processRESVConf(RESVConfMsg p, LSRNIC nic) {
 		LSRNIC forwardNIC;
 		receivedRESVConf(p);

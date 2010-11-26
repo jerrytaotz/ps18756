@@ -1,4 +1,8 @@
 package DataTypes;
+/**
+ * An RSVP RESV message
+ * @author Brady Tello
+ */
 
 import java.util.ArrayList;
 
@@ -75,6 +79,10 @@ public class RESVMsg extends rsvpPacket {
 		return this.label;
 	}
 	
+	/**
+	 * make a deep copy of this message
+	 * @return a deep copy of this message.
+	 */
 	public RESVMsg Clone(){
 		RESVMsg clone = new RESVMsg(this.source,this.dest,this.PHB,this.tClass,
 				this.tspec, (ArrayList<Integer>)this.prevHops.clone());

@@ -65,21 +65,23 @@ public class LSRNIC {
 		}
 		/*determine which queue this packet needs to go to*/
 		DSQueue = DSQueues.get(classifyPacket(currentPacket));
+		if(DSQueue == null) System.out.println("Router " + this.parent.getAddress() + 
+				" dropped packet " + currentPacket.getID() + "which contained an unknown DSCP. ");
 		this.runRED(currentPacket,DSQueue);
 	}
 	
 	/**
-	 * Will reserve the specified resources 
-	 * @param PHB
-	 * @param afClass
-	 * @param tspec
+	 * Will attempt to reserve the requested resources 
+	 * @param PHB the PHB to apply the reservation to
+	 * @param afClass the afClass to apply the reservation to
+	 * @param tspec the bandwidth being requested
 	 * @return true if the reservation was successful
 	 * false if the reservation failed.
 	 */
 	public boolean reserveBW(int PHB,int afClass,int tspec){
 		/*are there enough resources to accomodate this request?*/
 		if(tspec > this.availableBW){
-			System.out.println("PATHERR: Router " + parent.getAddress() +
+			System.out.println("RESVERR: Router " + parent.getAddress() +
 			"cannot accomodate RESV request. {Requested: " + tspec + ",Available: " + availableBW +
 			"}");
 			System.exit(0);

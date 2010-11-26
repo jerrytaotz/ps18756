@@ -1,9 +1,8 @@
 package DataTypes;
 /**
  * This class will be responsible for taking a set of DiffServ
- * queues and scheduling them for output.  It will do so in 
- * such a fashion that EF will experience low delay, low jitter,
- * and low loss.
+ * queues and scheduling them for output in a manner that will
+ * attempt to fulfill all of the current traffic reservations.
  * @author btello
  *
  */
@@ -55,7 +54,7 @@ public class WRRScheduler {
 		for(int i = 0;i<numToSend;i++){
 			nextP = nextQueue.remove();
 			outBuf.add(nextP);
-			sentData(nextP);
+			if(!nextP.isRSVP())sentData(nextP);
 		}
 		
 		/*service the remaining queues*/
@@ -79,14 +78,14 @@ public class WRRScheduler {
 			for(int j = 0;j < numToSend; j++){
 				nextP = nextQueue.remove();
 				outBuf.add(nextP);
-				sentData(nextP);
+				if(!nextP.isRSVP()) sentData(nextP);
 			}
 		}
 	}
 	
 	public void sentData(Packet p){
 		int address = parent.getParent().getAddress();
-		System.out.println("Router " + address + " transmitted packet to " + p.getDest() 
+		System.out.println("DATA: Router " + address + " transmitted a data packet to " + p.getDest() 
 				+ ": " + p.getID());
 	}
 }
