@@ -49,6 +49,14 @@ public class NICLabelPair implements Comparable<NICLabelPair>{
 	}
 	
 	/**
+	 * Sets the label for this pair to another value.
+	 * @param label the new label to use.
+	 */
+	public void setLabel(int label){
+		this.label = label;
+	}
+	
+	/**
 	 * Returns whether or not a given object is the same as this pair. I.e.
 	 * is it a pair containing the nic and label.
 	 * @return true/false the given object of the same as this object
