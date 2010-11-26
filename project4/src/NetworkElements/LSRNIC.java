@@ -113,8 +113,8 @@ public class LSRNIC {
 			}
 		case Constants.PHB_BE:
 			/*do nothing.  BE doesn't get to reserve BW*/
-			System.out.println("(Router " + parent.getAddress() + "): " +
-					"Fulfilled RESV request. {Requested: " + tspec + ",Now Available: " + availableBW +
+			System.out.println("RESV: NIC on router " + parent.getAddress() +
+					" fulfilled RESV request. {Requested: " + tspec + ",Now Available: " + availableBW +
 					"}");
 			return true;
 		default:
@@ -124,8 +124,8 @@ public class LSRNIC {
 		/*siphon off the BW from the BE class and update the available BW*/
 		DSQueues.get(BE).decreaseWeight(tspec);
 		availableBW -= tspec;
-		System.out.println("(Router " + parent.getAddress() + "): " +
-				"Fulfilled RESV request. {Requested: " + tspec + ",Now Available: " + availableBW +
+		System.out.println("RESV: NIC on router " + parent.getAddress() +
+				" fulfilled RESV request. {Requested: " + tspec + ",Now Available: " + availableBW +
 				"}");
 		return true;
 	}

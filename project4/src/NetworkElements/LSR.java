@@ -124,7 +124,7 @@ public class LSR{
 			header = new MPLS(outLabel,newPacket.getDSCP(),1);
 			newPacket.addMPLSheader(header);
 			forwardNIC.sendPacket(newPacket, this);
-			sentData(newPacket);
+			//sentData(newPacket);
 		}
 
 	}
@@ -289,6 +289,7 @@ public class LSR{
 				createLabelMapping(nic,p,true);
 				System.out.println("RESV: Router " + this.address + " terminated RESV msg "
 						+ p.getID() + " from router " + p.getSource());
+				sendResvConf(p.getSource());
 			}
 		}
 		/*if this is not p's destination*/
@@ -312,6 +313,17 @@ public class LSR{
 		}
 	}
 	
+	/**
+	 * send a reserve confirmation to a destination node.
+	 * @param dest the node this message needs to go to.
+	 */
+	private void sendResvConf(int dest) {
+		RESVConfMsg rc = new RESVConfMsg(this.address, dest);
+		LSRNIC forwardNIC = this.labelTable.getOutPair(dest).getNIC();
+		forwardNIC.sendPacket(rc, this);
+		sentRESVConf(rc);
+	}
+
 	/**
 	 * Adds a new entry to the MPLS label table after a successful resource reservation.
 	 * @param nic the outgoing NIC for the mapping
@@ -375,6 +387,19 @@ public class LSR{
 		else if(pType.compareTo("RESV") == 0){
 			processRESV((RESVMsg)p,nic);
 		}
+		else if(pType.compareTo("RESVCONF") == 0){
+			processRESVConf((RESVConfMsg)p,nic);
+		}
+	}
+
+	private void processRESVConf(RESVConfMsg p, LSRNIC nic) {
+		LSRNIC forwardNIC;
+		receivedRESVConf(p);
+		if(p.getDest() != this.address){
+			/*forward if needed*/
+			forwardNIC = this.labelTable.getOutPair(p.getDest()).getNIC();
+			forwardNIC.sendPacket(p, this);
+		}
 	}
 
 	/**
@@ -424,12 +449,26 @@ public class LSR{
 	
 	private void receivedData(Packet p){
 		System.out.println("DATA: Router " + this.address +" received data packet from router " 
-				+ p.getSource() + ": " + p.getID());
+				+ p.getSource() + " (delay = " + p.getDelay() + "): " + p.getID());
 	}
 
 	private void sentData(Packet p){
 		System.out.println("DATA: Router " + this.address + " sent DATA to " + p.getDest() + ": " 
 				+ p.getID());
+	}
+	
+	/**
+	 * Print messages about RESVConf packets
+	 * @param p
+	 */
+	private void sentRESVConf(Packet p){
+		System.out.println("RESVCONF: Router " + this.address + " sent a RESVCONF to router " +
+				p.getDest() + ": " + p.getID());
+	}
+	
+	private void receivedRESVConf(Packet p){
+		System.out.println("RESVCONF: Router " + this.address + " received a RESVCONF from router " +
+				p.getSource() + ": " + p.getID());
 	}
 	
 	/**

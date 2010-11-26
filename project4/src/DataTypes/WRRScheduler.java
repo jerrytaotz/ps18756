@@ -55,6 +55,7 @@ public class WRRScheduler {
 		for(int i = 0;i<numToSend;i++){
 			nextP = nextQueue.remove();
 			outBuf.add(nextP);
+			sentData(nextP);
 		}
 		
 		/*service the remaining queues*/
@@ -78,6 +79,7 @@ public class WRRScheduler {
 			for(int j = 0;j < numToSend; j++){
 				nextP = nextQueue.remove();
 				outBuf.add(nextP);
+				sentData(nextP);
 			}
 		}
 	}
