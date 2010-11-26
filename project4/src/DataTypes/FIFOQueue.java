@@ -5,16 +5,12 @@ import java.util.*;
 public class FIFOQueue{
 	private int weight;
 	private ArrayList<Packet> packets = new ArrayList<Packet>();
-	private int lowREDThresh;
-	private int highREDThresh;
 	
 	/**
 	 * Default constructor for a FIFO Queue
 	 */
 	public FIFOQueue(int weight){
 		this.weight = weight;
-		lowREDThresh = this.weight;
-		highREDThresh = 2*this.weight;
 	}
 	
 	/**
@@ -80,19 +76,44 @@ public class FIFOQueue{
 	}
 	
 	/**
+	 * Searches for a packet with lesser priority than p.  If there is one it is evicted 
+	 * in favor of p.
+	 * @param p
+	 * @return
+	 */
+	public Packet tryToEvict(Packet p){
+		Packet tgtPacket = this.findLeastImportant();
+		Packet droppedPacket = p;
+		if(tgtPacket.getDropPriority() > p.getDropPriority()){
+			/*drop the lower priority packet if there was one.*/
+			packets.remove(tgtPacket);
+			packets.add(tgtPacket);
+			droppedPacket = tgtPacket;
+		}
+		return droppedPacket;
+	}
+	
+	/**
+	 * Finds the packet with the highest drop priority in the queue.
+	 */
+	public Packet findLeastImportant(){
+		int max = 0;
+		Packet leastImportant = packets.get(0);
+		
+		for(Packet p:packets){
+			if(!p.isRSVP() && p.getDropPriority() > max){
+				max = p.getDropPriority();
+				leastImportant = p;
+			}
+		}
+		return leastImportant;
+	}
+	
+	/**
 	 * decrease the current WRR weight by 'dec'
 	 * @param inc
 	 */
 	public void decreaseWeight(int dec){
 		weight -= dec;
 	}
-	
-	public int getLowREDThresh(){
-		return lowREDThresh;
-	}
-	
-	public int getHighREDThresh(){
-		return highREDThresh;
-	}
-	
 }

@@ -64,6 +64,7 @@ public class QoSMonitor {
 	public void notifySend(Packet p){
 		int currNumSent = numSent.get(p.getDSCP());
 		currNumSent++;
+		numSent.put(p.getDSCP(), currNumSent);
 	}
 	
 	/**
@@ -73,13 +74,14 @@ public class QoSMonitor {
 	public void notifyDrop(Packet p){
 		int currDropCount = dropCounts.get(p.getDSCP());
 		currDropCount++;
+		dropCounts.put(p.getDSCP(), currDropCount);
 	}
 	
 	/**
 	 * Runs all of the functions which calculate the various network metrics and
 	 * prints the results to the terminal.
 	 */
-	public void calculateQoS(){
+	public void printQoSData(){
 	
 		printQoSLine("EF",Constants.DSCP_EF);
 		printQoSLine("AF11",Constants.DSCP_AF11);
@@ -109,7 +111,7 @@ public class QoSMonitor {
 		tput = calculateThroughput(dropRate, DSCP);
 	
 		System.out.println(tType + ":Latency - " + latency + " ms:Jitter - " + jitter + 
-				" ms:Throughput - " + tput + " %:Drop Rate - " + dropRate + "%:");
+				" ms:Throughput - " + (int)(tput*100) + " %:Drop Rate - " + (int)(dropRate*100) + "%:");
 	}
 	
 	/**
@@ -118,15 +120,16 @@ public class QoSMonitor {
 	 * @return
 	 */
 	private double calculateJitter(double meanLatency,int DSCP){
-		double meanJitter = 0.0;
 		double sum = 0.0;
 		ArrayList<Integer> classDelayList = delays.get(DSCP);
 		
 		/*calculate all the jitters*/
 		for(int delay:classDelayList){
-			sum += Math.pow((double)(delay-meanLatency), 2.0);
+			sum += Math.pow(((double)delay-meanLatency), 2.0);
 		}
-		return meanJitter/classDelayList.size();
+		/*if there was nothing sent, there was no delay*/
+		if(classDelayList.size() == 0) return 0.0;
+		return (double)sum/(double)classDelayList.size();
 	}
 	
 	/**
@@ -146,14 +149,15 @@ public class QoSMonitor {
 	 */
 	private double calculateLatency(int DSCP){
 		double sum = 0.0;
-		double meanLatency = 0.0;
 		ArrayList<Integer> classDelayList = delays.get(DSCP);
 		
 		/*calculate all the latencies*/
 		for(int delay:classDelayList){
 			sum += delay;
 		}
-		return meanLatency/classDelayList.size();
+		/*if there was nothing sent, there was no latency*/
+		if(classDelayList.size() == 0) return 0.0;
+		return sum/classDelayList.size();
 	}
 	
 	/**
@@ -162,6 +166,8 @@ public class QoSMonitor {
 	 * @return
 	 */
 	private double calculateDropRate(int DSCP){
-		return dropCounts.get(DSCP)/numSent.get(DSCP);
+		/*if you didn't send anything, nothing was dropped.*/
+		if(numSent.get(DSCP) == 0) return 0.0;
+		return (double)dropCounts.get(DSCP)/(double)numSent.get(DSCP);
 	}
 }

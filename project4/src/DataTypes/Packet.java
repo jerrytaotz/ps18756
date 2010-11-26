@@ -122,7 +122,7 @@ public class Packet {
 	 */
 	public int classifyDSCP(){
 		if(this.DSCP == 46) return Constants.PHB_EF;
-		else if(this.DSCP >= 11 && this.DSCP <= 43){
+		else if(this.DSCP >= 10 && this.DSCP <= 43){
 			return Constants.PHB_AF;
 		}
 		else if(this.DSCP == 0) return Constants.PHB_BE;
@@ -180,6 +180,16 @@ public class Packet {
 		default:
 			return 0;
 		}
+	}
+	
+	/**
+	 * return the drop priority of this packet by masking out the bits used for it.
+	 * @return
+	 */
+	public int getDropPriority(){
+		int mask = 0x06;
+		int maskedDSCP = mask & DSCP;
+		return maskedDSCP >> 1;
 	}
 }
 	

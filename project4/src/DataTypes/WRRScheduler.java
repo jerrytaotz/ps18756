@@ -86,7 +86,7 @@ public class WRRScheduler {
 	
 	public void sentData(Packet p){
 		int address = parent.getParent().getAddress();
-		System.out.println("DATA: Router " + address + "): Transmitted data to " + p.getDest() 
+		System.out.println("Router " + address + " transmitted packet to " + p.getDest() 
 				+ ": " + p.getID());
 	}
 }
