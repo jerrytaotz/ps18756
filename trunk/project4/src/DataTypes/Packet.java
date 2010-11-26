@@ -146,10 +146,10 @@ public class Packet {
 	
 	/**
 	 * Get the AF class of this packet.  If this packet is not an AF
-	 * stream, this method will return -1.  
+	 * stream, this method will return 0.  
 	 * TODO: this is sloppy.  Come back and see if you can do some bit
 	 * manipulations if you have time.
-	 * @return the AF class if this an AF packet.  If not, return -1.
+	 * @return the AF class if this an AF packet.  If not, return 0.
 	 */
 	public int getAFClass(){
 		switch(this.DSCP){
@@ -178,7 +178,7 @@ public class Packet {
 		case Constants.DSCP_AF43:
 			return 4;
 		default:
-			return -1;
+			return 0;
 		}
 	}
 }

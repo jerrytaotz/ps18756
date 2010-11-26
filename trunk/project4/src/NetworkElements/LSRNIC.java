@@ -15,6 +15,7 @@ public class LSRNIC {
 	private ArrayList<Packet> outputBuffer = new ArrayList<Packet>(); // Where packets are put to be sent
 	private ArrayList<FIFOQueue> DSQueues;
 	private WRRScheduler scheduler;
+	private QoSMonitor monitor;
 	
 	public final static int EF = 0;
 	public final static int AF1 = 1;
@@ -249,5 +250,13 @@ public class LSRNIC {
 	 */
 	public int getNeighborAddress(){
 		return link.getNeighborAddress(this);
+	}
+	
+	/**
+	 * Sets the QoS monitor for this NIC.
+	 * @param monitor
+	 */
+	public void setQoSMonitor(QoSMonitor monitor){
+		this.monitor = monitor;
 	}
 }

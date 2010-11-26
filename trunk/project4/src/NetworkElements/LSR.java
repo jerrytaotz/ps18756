@@ -14,6 +14,7 @@ public class LSR{
 	private LabelTable labelTable = new LabelTable();
 	//private TreeMap<Integer, NICLabelPair> labelTable; // a map of input label to output nic and label
 	private ArrayList<Packet> waitingPackets;
+	private QoSMonitor monitor;
 
 	//TODO: Write a smoother
 	
@@ -110,28 +111,14 @@ public class LSR{
 		//This method should send the packet to the correct NIC.
 		if(!labelTable.containsLSP(newPacket.getDest())){
 			//NO LSP! Set one up on the fly with BE service
-			allocateBandwidth(newPacket.getDest(),Constants.PHB_BE,0,0);
-			//LSP_PENDING signals that we should queue incoming packets until RESV is received 
-			newOutPair = new NICLabelPair(routingTable.get(newPacket.getDest()),
-					NICLabelPair.LSP_PENDING);
-			labelTable.put(this.address,newPacket.getDest(),newPacket.getDest(), newOutPair);
-			waitingPackets.add(newPacket);
+			setupLSPOnTheFly(newPacket);
 		}
 		else if(labelTable.getOutPair(newPacket.getDest()).getLabel() == NICLabelPair.LSP_PENDING){
 			/*We are waiting on a RESV message for this LSP.  Just queue up until it's received*/
 			waitingPackets.add(newPacket);
 		}
 		else{
-			/*clear the waiting packets queue*/
-			for(Packet p:waitingPackets){
-				forwardNIC = labelTable.getOutPair(p.getDest()).getNIC();
-				/*add the MPLS info now that we have all the LSP setup*/
-				outLabel = labelTable.getOutPair(p.getDest()).getLabel();
-				header = new MPLS(outLabel,p.getDSCP(),1);
-				p.addMPLSheader(header);
-				forwardNIC.sendPacket(p, this);
-				sentData(p);
-			}
+			/*send the new packet*/
 			forwardNIC = labelTable.getOutPair(newPacket.getDest()).getNIC();
 			outLabel = labelTable.getOutPair(newPacket.getDest()).getLabel();
 			header = new MPLS(outLabel,newPacket.getDSCP(),1);
@@ -142,6 +129,44 @@ public class LSR{
 
 	}
 
+	/**
+	 * If a packet was sent to a destination for which there was no LSP, this method
+	 * establishes one on the fly with the requested class of service.
+	 * @param newPacket
+	 */
+	private void setupLSPOnTheFly(Packet newPacket){
+		NICLabelPair newOutPair;
+		
+		newPacket.setDSCP(Constants.DSCP_BE);
+		allocateBandwidth(newPacket.getDest(),Constants.PHB_BE,0,0);
+		//LSP_PENDING signals that we should queue incoming packets until RESV is received 
+		newOutPair = new NICLabelPair(routingTable.get(newPacket.getDest()),
+				NICLabelPair.LSP_PENDING);
+		labelTable.put(this.address,newPacket.getDest(),newPacket.getDest(), newOutPair);
+		waitingPackets.add(newPacket);
+	}
+	
+	/**
+	 * Clear out any packets that may have been waiting on an LSP
+	 * @param resv the resv message which triggered the release
+	 */
+	private void sendWaitingPackets(RESVMsg resv){
+		int outLabel;
+		LSRNIC forwardNIC;
+		MPLS header;
+		
+		for(Packet p:waitingPackets){
+			if(p.getDest() == resv.getSource()){
+				forwardNIC = labelTable.getOutPair(p.getDest()).getNIC();
+				/*add the MPLS info now that we have all the LSP setup*/
+				outLabel = labelTable.getOutPair(p.getDest()).getLabel();
+				header = new MPLS(outLabel,p.getDSCP(),1);
+				p.addMPLSheader(header);
+				forwardNIC.sendPacket(p, this);
+				sentData(p);
+			}
+		}
+	}
 	/**
 	 * Makes each nic move its cells from the output buffer across the link to the next router's nic
 	 * @since 1.0
@@ -262,7 +287,7 @@ public class LSR{
 			if(nic.reserveBW(p.getPHB(), p.gettClass(), p.getTspec()) == true){
 				/*set up label mapping*/
 				createLabelMapping(nic,p,true);
-				System.out.println("(Router " + this.address + "): Terminated RESV msg "
+				System.out.println("RESV: Router " + this.address + " terminated RESV msg "
 						+ p.getID() + " from router " + p.getSource());
 			}
 		}
@@ -299,9 +324,19 @@ public class LSR{
 		NICLabelPair newPair;
 		int inLabel,outLabel;
 		int dest = p.getDest(), source = p.getSource();
+		NICLabelPair outPair;
 		
 		/*first check if a mapping already exists*/
 		if(labelTable.labelExists(dest, source)){
+			/*check if the mapping was waiting for an LSP*/
+			outPair = labelTable.getOutPair(source);
+			if(outPair.getLabel() == NICLabelPair.LSP_PENDING){
+				outPair.setLabel(p.getLabel());
+				status("Releasing packet hold. Using label mapping {in:" 
+						+ labelTable.getInLabel(dest, source) + ",out:" + outPair.getLabel() + "}");
+				sendWaitingPackets(p);
+				return true;
+			}
 			inLabel = labelTable.getInLabel(dest, source);
 			outLabel = labelTable.get(inLabel).getLabel();
 			status("Using existing label mapping {in: " + inLabel + ",out: " + outLabel + "}");
@@ -343,6 +378,17 @@ public class LSR{
 	}
 
 	/**
+	 * set the QoS monitor for this router and all of its nics.
+	 * @param monitor the QoSMonitor you want to hook up to this router.
+	 */
+	public void setQoSMonitor(QoSMonitor monitor){
+		this.monitor = monitor;
+		for(LSRNIC nic:nics){
+			nic.setQoSMonitor(monitor);
+		}
+	}
+	
+	/**
 	 * Prints when a router receives an RSVP packet
 	 */
 	private void receivedRSVP(rsvpPacket p){
@@ -354,8 +400,8 @@ public class LSR{
 	 * prints when a router receives/sends a PATH msg.
 	 */
 	private void receivedPATH(PATHMsg p){
-		System.out.println("(Router " + this.address +"): received PATH message " 
-				+ p.getID() + " {src: " + p.getSource() + ", dest: " +p.getDest()+"}");
+		System.out.println("PATH: Router " + this.address +" received a PATH from router " 
+				+ p.getSource() + ": " + p.getID());
 	}
 
 	private void sentPATH(PATHMsg p){
@@ -377,9 +423,8 @@ public class LSR{
 	}
 	
 	private void receivedData(Packet p){
-		System.out.println("(Router " + this.address +"): received data packet " 
-				+ p.getID() + " {src:" + p.getSource() + ",dest:" +p.getDest()+",delay:" 
-				+p.getDelay() + "}");
+		System.out.println("DATA: Router " + this.address +" received data packet from router " 
+				+ p.getSource() + ": " + p.getID());
 	}
 
 	private void sentData(Packet p){
