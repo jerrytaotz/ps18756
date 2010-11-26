@@ -178,8 +178,98 @@ public class TestNet1 {
 	@Test
 	public void testDataTransfer2(){
 		r1.createPacket(5, Constants.DSCP_EF);
+		r1.createPacket(5, Constants.DSCP_AF11);
 		for(int i=0;i<10;i++){
 			tock();
 		}
+	}
+	
+	/**
+	 * Test RESVERR prints and quits.
+	 */
+	@Test
+	public void testRESVERR1(){
+		r1.allocateBandwidth(5, Constants.DSCP_EF, 0, 60);
+		for(int i = 0;i<10;i++) tock();
+	}
+	
+	/**
+	 * Test the QoS monitor in a very basic setup
+	 */
+	@Test
+	public void testQoSMonitor1(){
+		QoSMonitor monitor = new QoSMonitor();
+		r1.setQoSMonitor(monitor);
+		r2.setQoSMonitor(monitor);
+		r3.setQoSMonitor(monitor);
+		r4.setQoSMonitor(monitor);
+		r5.setQoSMonitor(monitor);
+		r6.setQoSMonitor(monitor);
+		
+		r1.allocateBandwidth(5, Constants.PHB_EF, 0, 10);
+		for(int i = 0; i<10;i++){
+			tock();
+		}
+		r1.createPacket(5, Constants.DSCP_EF);
+		for(int i = 0; i<10;i++){
+			tock();
+		}
+		
+		monitor.printQoSData();
+	}
+	
+	/**
+	 * Test the QoS monitor in a more advanced setup.
+	 */
+	/**
+	 * Test the QoS monitor in a very basic setup similar to what the actual data collection
+	 * setup will be.
+	 */
+	@Test
+	public void testQoSMonitor2(){
+		QoSMonitor monitor = new QoSMonitor();
+		r1.setQoSMonitor(monitor);
+		r2.setQoSMonitor(monitor);
+		r3.setQoSMonitor(monitor);
+		r4.setQoSMonitor(monitor);
+		r5.setQoSMonitor(monitor);
+		r6.setQoSMonitor(monitor);
+		
+		r1.allocateBandwidth(2, Constants.PHB_EF, 0, 5);
+		r1.allocateBandwidth(2, Constants.PHB_AF, 1, 5);
+		r1.allocateBandwidth(2, Constants.PHB_AF, 2, 4);
+		r1.allocateBandwidth(2, Constants.PHB_AF, 3, 8);
+		r1.allocateBandwidth(2, Constants.PHB_BE, 0, 0);
+		for(int i = 0;i<4;i++) tock();
+		
+		for(int i = 0; i<15;i++){
+			for(int j = 0; j<5;j++){
+				r1.createPacket(2, Constants.DSCP_EF);
+			}
+			for(int j = 0; j<3;j++){
+				r1.createPacket(2, Constants.DSCP_AF11);
+			}
+			for(int j = 0; j<2;j++){
+				r1.createPacket(2, Constants.DSCP_AF12);
+			}
+			for(int j = 0; j<3;j++){
+				r1.createPacket(2, Constants.DSCP_AF21);
+			}
+			for(int j = 0; j<2;j++){
+				r1.createPacket(2, Constants.DSCP_AF22);
+			}
+			for(int j = 0; j<4;j++){
+				r1.createPacket(2, Constants.DSCP_AF31);
+			}
+			for(int j = 0; j<5;j++){
+				r1.createPacket(2, Constants.DSCP_AF32);
+			}
+			for(int j = 0; j<40;j++){
+				r1.createPacket(2, Constants.DSCP_BE);
+			}
+			tock();
+		}
+		
+		monitor.printQoSData();
 	}
 }

@@ -14,7 +14,7 @@ public class LSR{
 	private LabelTable labelTable = new LabelTable();
 	//private TreeMap<Integer, NICLabelPair> labelTable; // a map of input label to output nic and label
 	private ArrayList<Packet> waitingPackets;
-	private QoSMonitor monitor;
+	private QoSMonitor monitor = null;
 
 	//TODO: Write a smoother
 	
@@ -60,6 +60,7 @@ public class LSR{
 		}
 		//if destined for this router, hold on to it
 		else if(currentPacket.getDest() == this.address){
+			if(monitor != null) monitor.notifyReceive(currentPacket);
 			receivedData(currentPacket);
 		}
 		//else forward it
@@ -77,6 +78,7 @@ public class LSR{
 	public void createPacket(int destination, int DSCP){
 		Packet newPacket= new Packet(this.getAddress(), destination, DSCP);
 		this.sendPacket(newPacket);
+		if(monitor!=null) monitor.notifySend(newPacket);
 	}
 
 	/**
@@ -163,10 +165,10 @@ public class LSR{
 				header = new MPLS(outLabel,p.getDSCP(),1);
 				p.addMPLSheader(header);
 				forwardNIC.sendPacket(p, this);
-				sentData(p);
 			}
 		}
 	}
+	
 	/**
 	 * Makes each nic move its cells from the output buffer across the link to the next router's nic
 	 * @since 1.0
@@ -414,16 +416,15 @@ public class LSR{
 	}
 	
 	/**
-	 * Prints when a router receives an RSVP packet
+	 * ==========================================
+	 * Status printing methods
+	 * ==========================================
 	 */
 	private void receivedRSVP(rsvpPacket p){
 		System.out.println("(Router " + this.address +"): received an RSVP packet: " 
 				+ p.getID());
 	}
 
-	/**
-	 * prints when a router receives/sends a PATH msg.
-	 */
 	private void receivedPATH(PATHMsg p){
 		System.out.println("PATH: Router " + this.address +" received a PATH from router " 
 				+ p.getSource() + ": " + p.getID());
@@ -434,9 +435,6 @@ public class LSR{
 				+ p.getDest() + ": " +p.getID());
 	}
 
-	/**
-	 * prints when a router receives/sends a RESV msg.
-	 */
 	private void receivedRESV(RESVMsg p){
 		System.out.println("RESV: Router " + this.address + " received a RESV from router " 
 				+ p.getSource() + ": " + p.getID());
@@ -457,10 +455,6 @@ public class LSR{
 				+ p.getID());
 	}
 	
-	/**
-	 * Print messages about RESVConf packets
-	 * @param p
-	 */
 	private void sentRESVConf(Packet p){
 		System.out.println("RESVCONF: Router " + this.address + " sent a RESVCONF to router " +
 				p.getDest() + ": " + p.getID());
@@ -471,10 +465,6 @@ public class LSR{
 				p.getSource() + ": " + p.getID());
 	}
 	
-	/**
-	 * print a status message from this router.
-	 * @param s
-	 */
 	private void status(String s){
 		System.out.println("(Router " + this.address + "): " + s);
 	}

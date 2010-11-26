@@ -4,8 +4,8 @@ import DataTypes.*;
 import java.util.*;
 
 public class LSRNIC {
-	private int maximumBuffer = 100; // the maximum number of packets in the output buffer
-	private int startDropAt = 20; // the minimum number of packets in the output buffer before we start dropping packets
+	private int REDMaxThresh = 100; // the maximum number of packets in the output buffer
+	private int REDMinThresh = 20; // the minimum number of packets in the output buffer before we start dropping packets
 	private int lineRate = 50;  //number of packets we can send during each time interval
 	private int availableBW = lineRate;
 	private boolean trace = false; // should we print out debug statements?
@@ -15,7 +15,7 @@ public class LSRNIC {
 	private ArrayList<Packet> outputBuffer = new ArrayList<Packet>(); // Where packets are put to be sent
 	private ArrayList<FIFOQueue> DSQueues;
 	private WRRScheduler scheduler;
-	private QoSMonitor monitor;
+	private QoSMonitor monitor = null;
 	
 	public final static int EF = 0;
 	public final static int AF1 = 1;
@@ -79,10 +79,10 @@ public class LSRNIC {
 	public boolean reserveBW(int PHB,int afClass,int tspec){
 		/*are there enough resources to accomodate this request?*/
 		if(tspec > this.availableBW){
-			System.out.println("(Router " + parent.getAddress() + "): " +
-			"Cannot accomodate RESV request. {Requested: " + tspec + ",Available: " + availableBW +
+			System.out.println("PATHERR: Router " + parent.getAddress() +
+			"cannot accomodate RESV request. {Requested: " + tspec + ",Available: " + availableBW +
 			"}");
-			return false;
+			System.exit(0);
 		}
 		
 		switch(PHB){
@@ -176,8 +176,51 @@ public class LSRNIC {
 	private void runRED(Packet currentPacket,FIFOQueue q){
 		boolean packetDropped = false;
 		double dropProbability = 0.0;
+		Random rnd = new Random();
+		double aveInt;
+		int sidesOfADie; //used to "roll a die" to see if packet gets dropped or not
+		Packet droppedPacket;
 		
-		q.insert(currentPacket);
+		/*just use the actual queue size rather than an ave.*/
+		aveInt = q.getNumPackets();
+		
+		/*If the average is between the min and max thresh*/
+		if(aveInt > REDMinThresh && aveInt < REDMaxThresh){
+			/*
+			 *Create a "die" to roll for this packet.
+			 *the die has less sides the closer we get to the max thresh.
+			 */
+			sidesOfADie = (REDMaxThresh + 1) - (int)aveInt;
+			dropProbability = 1.0/(double)sidesOfADie;
+			/*roll the die. Drop packet on a 1*/
+			if((rnd.nextInt(sidesOfADie) + 1) == 1){
+				packetDropped = true;
+			}
+			else{
+				outputBuffer.add(currentPacket);
+			}
+		}
+		else if(aveInt > REDMaxThresh){
+			/*If this is an RSVP cell we need to force it in by evicting some other cell*/
+			if(!currentPacket.isRSVP()){
+				packetDropped = true;
+				dropProbability = 1.0;
+			}
+		}
+		
+		/*insert the packet in it's queue if it passed*/
+		if(packetDropped == false){
+			q.insert(currentPacket);
+			return;
+		}
+		else{
+			/*if RED says we need to drop something, see if any lesser priority can be dropped*/
+			droppedPacket = q.tryToEvict(currentPacket);
+			if(this.monitor != null) monitor.notifyDrop(currentPacket);
+			System.out.println("RED: NIC on Router " + this.parent.getAddress() + " dropped packet " +
+					droppedPacket.getID() + " DSCP " + currentPacket.getDSCP() + " with probability " 
+					+ dropProbability);
+		}
 	}
 	
 	/**

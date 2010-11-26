@@ -1,3 +1,5 @@
+import DataTypes.Constants;
+import DataTypes.QoSMonitor;
 import NetworkElements.*;
 import java.util.*;
 
@@ -8,6 +10,7 @@ public class example {
 	private int time = 0;
 	private ArrayList<LSR> allConsumers = new ArrayList<LSR>();
 	private DirectedGraph map = new DirectedGraph();
+	private QoSMonitor monitor = new QoSMonitor();
 	/**
 	 * Create a network and creates connections
 	 * @since 1.0
@@ -16,63 +19,69 @@ public class example {
 	
 		System.out.println("** SYSTEM SETUP **");
 		
-		// Create some new ATM Routers
-		LSR r1 = new LSR(9);
-		LSR r2 = new LSR(3);
-		LSR r3 = new LSR(11);
-		LSR r4 = new LSR(13);
-		LSR r5 = new LSR(14);
+		/* Create some new ATM Routers*/
+		LSR r1 = new LSR(1);
+		LSR r2 = new LSR(2);
 		
-		// give the routers interfaces
+		/* give the routers interfaces*/
 		LSRNIC r1n1 = new LSRNIC(r1);
 		LSRNIC r2n1 = new LSRNIC(r2);
-		LSRNIC r2n2 = new LSRNIC(r2);
-		LSRNIC r2n3 = new LSRNIC(r2);
-		LSRNIC r3n1 = new LSRNIC(r3);
-		LSRNIC r4n1 = new LSRNIC(r4);
-		LSRNIC r4n2 = new LSRNIC(r4);
-		LSRNIC r5n1 = new LSRNIC(r5);
 		
-		// physically connect the router's nics
+		/* physically connect the router's nics */
 		OtoOLink l1 = new OtoOLink(r1n1, r2n1);
-		OtoOLink l2 = new OtoOLink(r2n2, r3n1);
-		OtoOLink l3 = new OtoOLink(r2n3, r4n1);
-		OtoOLink l4 = new OtoOLink(r4n2, r5n1);
 		
 		//Update the network map to reflect any new links
 		l1.updateNetworkMap(map);
-		l2.updateNetworkMap(map);
-		l3.updateNetworkMap(map);
-		l4.updateNetworkMap(map);
-		
+
 		//update all the routing tables
 		r1.updateRoutingTable(map);
 		r2.updateRoutingTable(map);
-		r3.updateRoutingTable(map);
-		r4.updateRoutingTable(map);
-		r5.updateRoutingTable(map);
 		
 		// Add the objects that need to move in time to an array
 		this.allConsumers.add(r1);
 		this.allConsumers.add(r2);
-		this.allConsumers.add(r3);
-		this.allConsumers.add(r4);
-		this.allConsumers.add(r5);
+
+		r1.setQoSMonitor(monitor);
+		r2.setQoSMonitor(monitor);
 		
-		/*for(LSR r:allConsumers){
-			r.printRoutingTable();
-		}*/
+		r1.allocateBandwidth(2, Constants.PHB_EF, 0, 5);
+		r1.allocateBandwidth(2, Constants.PHB_AF, 1, 5);
+		r1.allocateBandwidth(2, Constants.PHB_AF, 2, 4);
+		r1.allocateBandwidth(2, Constants.PHB_AF, 3, 8);
+		r1.allocateBandwidth(2, Constants.PHB_BE, 0, 0);
+		/*tock() until all the LSPs are set up*/
+		for(int i = 0;i<4;i++) tock();
 		
-		//send packets from router 1 to the other routers...
-		r1.createPacket(11, 0);
-		r1.createPacket(3, 0);
-		r1.createPacket(11, 0);
-		r1.createPacket(13, 0);
-		r1.createPacket(14, 0);
-		
-		for(int i=0;i<15;i++){
+		/*start sending traffic as required*/
+		for(int i = 0; i<15;i++){
+			for(int j = 0; j<5;j++){
+				r1.createPacket(2, Constants.DSCP_EF);
+			}
+			for(int j = 0; j<3;j++){
+				r1.createPacket(2, Constants.DSCP_AF11);
+			}
+			for(int j = 0; j<2;j++){
+				r1.createPacket(2, Constants.DSCP_AF12);
+			}
+			for(int j = 0; j<3;j++){
+				r1.createPacket(2, Constants.DSCP_AF21);
+			}
+			for(int j = 0; j<2;j++){
+				r1.createPacket(2, Constants.DSCP_AF22);
+			}
+			for(int j = 0; j<4;j++){
+				r1.createPacket(2, Constants.DSCP_AF31);
+			}
+			for(int j = 0; j<5;j++){
+				r1.createPacket(2, Constants.DSCP_AF32);
+			}
+			for(int j = 0; j<40;j++){
+				r1.createPacket(2, Constants.DSCP_BE);
+			}
 			tock();
 		}
+		
+		monitor.printQoSData();
 	}
 	
 	public void tock(){
