@@ -1,5 +1,8 @@
 package DataTypes;
-
+/**
+ * An RSVP PATH message.
+ * @author Brady Tello
+ */
 import java.util.*;
 
 public class PATHMsg extends rsvpPacket {

@@ -1,7 +1,13 @@
 package DataTypes;
+/**
+ * A convenient place holder for some of the constants that show up in various places 
+ * throughout the network.
+ * @author Brady
+ *
+ */
 
 public class Constants {
-	/*aliases for the different DS PHBs. Used for readability*/
+	/*aliases for the different DS PHBs and DSCPs. Used for readability*/
 	public static final int PHB_EF = 0;
 	public static final int PHB_AF = 1;
 	public static final int PHB_BE = 2;

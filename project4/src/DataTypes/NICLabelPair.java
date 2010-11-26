@@ -1,8 +1,5 @@
 /**
- * @author andy modified by btello
- * @version 1.0
- * @date 24-10-2008
- * @since 1.0
+ * @author btello
  */
 
 package DataTypes;

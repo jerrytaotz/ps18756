@@ -1,4 +1,9 @@
 package DataTypes;
+/**
+ * A weighted FIFO queue.  Since it has a weight attached to it, this can be used
+ * very easily in a weighted round robin scheduling scheme.
+ * @author Brady Tello
+ */
 
 import java.util.*;
 

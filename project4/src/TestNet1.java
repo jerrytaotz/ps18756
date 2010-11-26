@@ -173,6 +173,59 @@ public class TestNet1 {
 	}
 	
 	/**
+	 * Test what happens when you send to a DSCP you dont have a reservation for.
+	 */
+	
+	/**
+	 * Test a more realistic traffic pattern.
+	 */
+	@Test
+	public void testDataTransfer3(){
+		
+		QoSMonitor monitor = new QoSMonitor();
+		r1.setQoSMonitor(monitor);
+		r2.setQoSMonitor(monitor);
+		r3.setQoSMonitor(monitor);
+		r4.setQoSMonitor(monitor);
+		r5.setQoSMonitor(monitor);
+		r6.setQoSMonitor(monitor);
+		
+		r1.allocateBandwidth(2, Constants.PHB_BE, 0, 0);
+		r1.allocateBandwidth(6, Constants.PHB_AF, 2, 10);
+		r5.allocateBandwidth(3, Constants.PHB_EF, 0, 10);
+		r6.allocateBandwidth(4, Constants.PHB_AF, 2, 10);
+		r4.allocateBandwidth(6, Constants.PHB_BE, 0, 0);
+		r3.allocateBandwidth(5, Constants.PHB_AF, 3, 15);
+		for(int i = 0;i<11;i++){
+			tock();
+		}
+		
+		for(int i = 0;i<15;i++){
+			for(int j = 0;j<50;j++){
+				r1.createPacket(2, Constants.DSCP_BE);
+			}
+			for(int j = 0;j<10;j++){
+				r1.createPacket(6, Constants.DSCP_AF22);
+			}
+			for(int j = 0;j<10;j++){
+				r5.createPacket(3, Constants.DSCP_EF);
+			}
+			for(int j = 0;j<10;j++){
+				r6.createPacket(4, Constants.DSCP_AF22);
+			}
+			for(int j = 3;j<50;j++){
+				r4.createPacket(6, Constants.DSCP_BE);
+			}
+			for(int j = 6;j<20;j++){
+				r3.createPacket(5, Constants.DSCP_AF32);
+			}
+			tock();
+		}
+		for(int i = 0;i<10;i++) tock();
+		monitor.printQoSData();
+	}
+	
+	/**
 	 * Test whether on-the-fly bandwidth reservation is working
 	 */
 	@Test
@@ -192,7 +245,7 @@ public class TestNet1 {
 		r1.allocateBandwidth(5, Constants.DSCP_EF, 0, 60);
 		for(int i = 0;i<10;i++) tock();
 	}
-	
+		
 	/**
 	 * Test the QoS monitor in a very basic setup
 	 */
@@ -218,9 +271,6 @@ public class TestNet1 {
 		monitor.printQoSData();
 	}
 	
-	/**
-	 * Test the QoS monitor in a more advanced setup.
-	 */
 	/**
 	 * Test the QoS monitor in a very basic setup similar to what the actual data collection
 	 * setup will be.

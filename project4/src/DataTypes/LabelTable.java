@@ -1,4 +1,11 @@
 package DataTypes;
+/**
+ * A table containing rows for every LSP in a given LSR.  A row has the following format:
+ * int source | int dest | int input label | NICLabelPair output nic and label
+ * Once an LSP is added, a new row is added to the table.  Lookups can be done in a variety
+ * of fashions (see method documentation).
+ * @author Brady
+ */
 
 import java.util.*;
 
@@ -72,10 +79,10 @@ public class LabelTable {
 	
 	/**
 	 * Insert a new row into this table.
-	 * @param source
-	 * @param dest
-	 * @param inLabel
-	 * @param nlPair
+	 * @param source the transmitting end of the LSP
+	 * @param dest the receiving end of the LSP
+	 * @param inLabel the input label for this node
+	 * @param nlPair the output label and nic corresponding to the inLabel
 	 */
 	public void put(int source, int dest, int inLabel, NICLabelPair nlPair){
 		ltEntry newEntry = new ltEntry(source, dest, inLabel, nlPair);
@@ -84,9 +91,9 @@ public class LabelTable {
 	
 	/**
 	 * Returns the input label for a given source/destination pair.
-	 * @param source the source node associated with a 
-	 * @param dest
-	 * @return
+	 * @param source the transmitting end of the LSP
+	 * @param dest the receiving end of the LSP
+	 * @return the label corresponding to <source,dest>.  -1 if none exists
 	 */
 	public int getInLabel(int source, int dest){
 		for(ltEntry e:entries){
@@ -99,8 +106,9 @@ public class LabelTable {
 	
 	/**
 	 * Determine whether or not a specific inLabel is in this table.
-	 * @param inLabel
-	 * @return
+	 * @param inLabel the label to be queried for
+	 * @return true if the label existed in the table
+	 * @return false otherwise
 	 */
 	public boolean containsInLabel(int inLabel){
 		for(ltEntry e:entries){
@@ -113,7 +121,8 @@ public class LabelTable {
 	
 	/**
 	 * Tells you if there is an LSP set up to a destination or not.
-	 * @author Brady
+	 * @param dest the destination node of interest
+	 * @return true if there is an LSP leading to dest.  false otherwise
 	 */
 	public boolean containsLSP(int dest){
 		for(ltEntry e:entries){
@@ -124,12 +133,23 @@ public class LabelTable {
 		return false;
 	}
 	
+	/**
+	 * A private class which represents a row in the table.
+	 * @author Brady
+	 */
 	private class ltEntry{
 		private int source;
 		private int dest;
 		private int inLabel;
 		private NICLabelPair nlPair;
 		
+		/**
+		 * Create a new row in the label table.
+		 * @param source 
+		 * @param dest
+		 * @param inLabel
+		 * @param nlPair
+		 */
 		public ltEntry(int source, int dest, int inLabel, NICLabelPair nlPair){
 			this.source = source;
 			this.dest = dest;
@@ -137,6 +157,11 @@ public class LabelTable {
 			this.nlPair = nlPair;
 		}
 		
+		/**
+		 * =============================
+		 * accessors and mutators
+		 * =============================
+		 */
 		public int getSource(){
 			return this.source;
 		}

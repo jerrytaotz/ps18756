@@ -1,4 +1,9 @@
 package DataTypes;
+/**
+ * An RSVP RESVConf message
+ * @author Brady
+ *
+ */
 
 public class RESVConfMsg extends rsvpPacket {
 
