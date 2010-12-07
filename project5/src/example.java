@@ -14,11 +14,11 @@ public class example {
 		System.out.println("** SYSTEM SETUP **");
 		
 		// Create some new ATM Routers
-		LSR r1 = new LSR(9);
-		LSR r2 = new LSR(3);
-		LSR r3 = new LSR(11);
-		LSR r4 = new LSR(13);
-		LSR r5 = new LSR(15);
+		LSR r1 = new PscLSR(9);
+		LSR r2 = new PscLSR(3);
+		LSR r3 = new PscLSR(11);
+		LSR r4 = new PscLSR(13);
+		LSR r5 = new PscLSR(15);
 		
 		// give the routers interfaces
 		LSRNIC r1n1 = new LSRNIC(r1);

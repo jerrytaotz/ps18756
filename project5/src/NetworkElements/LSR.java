@@ -1,11 +1,14 @@
 package NetworkElements;
 
 import java.util.*;
+
+import dijkstra.*;
 import DataTypes.*;
 
-public class LSR{
-	private int address; // The AS address of this router
-	private ArrayList<LSRNIC> nics = new ArrayList<LSRNIC>(); // all of the nics in this router
+public abstract class LSR{
+	protected int address; // The AS address of this router
+	protected ArrayList<LSRNIC> nics; // all of the nics in this router
+	protected PathCalculator pc;
 	
 	/**
 	 * The default constructor for an ATM router
@@ -14,6 +17,8 @@ public class LSR{
 	 */
 	public LSR(int address){
 		this.address = address;
+		nics = new ArrayList<LSRNIC>();
+		pc = new PathCalculator();
 	}
 	
 	/**
@@ -114,4 +119,20 @@ public class LSR{
 			p.setOAM(true, "KeepAlive");
 			this.sendPacket(p);
 	}
+	
+	/**
+	 * A method to test whether or not the IP routing tables are working correctly
+	 * for both the data and control planes.
+	 * @param dest the address of the router you would like to find the outgoing NIC for
+	 * @param control true if you would like to find the control path NIC to dest
+	 * @return the destination 
+	 */
+	abstract public LSRNIC getDestNICviaIP(int dest,boolean control);
+	
+	/**
+	 * A method to print a customized error message including the concrete type of the 
+	 * router and its address
+	 * @param errorMsg
+	 */
+	abstract protected void errorPrint(String errorMsg);
 }
