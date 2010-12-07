@@ -10,11 +10,22 @@ public class LSRNIC {
 	private boolean trace = false; // should we print out debug statements?
 	private ArrayList<Packet> inputBuffer = new ArrayList<Packet>(); // Where packets are put between the parent and nic
 	private ArrayList<Packet> outputBuffer = new ArrayList<Packet>(); // Where packets are put to be sent
+	private String id = null;
 	private int linerate = 50;
 	/**
 	 * Default constructor for an ATM NIC
 	 * @param parent
+	 * @param id the initial ID for this NIC
 	 * @since 1.0
+	 */
+	public LSRNIC(LSR parent,String id){
+		this.parent = parent;
+		this.parent.addNIC(this);
+		this.id = id;
+	}
+	/**
+	 * use this constructor if you don't want to specifiy an ID for this NIC
+	 * @param parent
 	 */
 	public LSRNIC(LSR parent){
 		this.parent = parent;
@@ -82,5 +93,46 @@ public class LSRNIC {
 		for(int i=0; i<this.inputBuffer.size(); i++)
 			this.parent.receivePacket(this.inputBuffer.get(i), this);
 		this.inputBuffer.clear();
+	}
+	
+	/**
+	 * Returns this nic's parent router
+	 * @return the parent router for this NIC
+	 */
+	public LSR getParent(){
+		return this.parent;
+	}
+	
+	/**
+	 * Returns the address of the router on the other end of the link.
+	 * @return the address of the machine on the other end.
+	 */
+	public int getNeighborAddress(){
+		return link.getOtherNIC(this).getParent().getAddress();
+	}
+	
+	/**
+	 * Return the available bandwidth for this NIC.  Since we are assuming infinite linerate
+	 * for this project, we will always return the linerate.
+	 * @return the linerate for this NIC
+	 */
+	public int getAvailableBW(){
+		return this.linerate;
+	}
+	
+	/**
+	 * set the ID of this NIC.  Simulates a MAC address.
+	 * @param id the new ID for this NIC
+	 */
+	public void setId(String id){
+		this.id = id;
+	}
+	
+	/**
+	 * return the ID of this NIC
+	 * @return the ID for this NIC
+	 */
+	public String getId(){
+		return this.id;
 	}
 }

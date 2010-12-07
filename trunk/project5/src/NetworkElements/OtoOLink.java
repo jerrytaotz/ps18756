@@ -1,5 +1,7 @@
 package NetworkElements;
 
+import dijkstra.DirectedGraph;
+import dijkstra.Node;
 import DataTypes.*;
 
 public class OtoOLink {
@@ -90,6 +92,41 @@ public class OtoOLink {
 		this.lossOfLight = lossOfLight;
 	}
 
+	/**
+	 * Updates a given directed Graph such that this link and both its end nodes will be included
+	 * in the map.  The network itself will not be affected in any way by calling this function.  The
+	 * only thing which will be modified is the map itself.  This will allow you to create many graphs
+	 * for a network topology.
+	 * @param map the directed graph this link should be added to.
+	 */
+	public void updateNetworkMap(DirectedGraph map){		
+		LSR lsr1 = r1NIC.getParent();
+		LSR lsr2 = r2NIC.getParent();
+		float linkCost = 1/(float)r1NIC.getAvailableBW();
+
+		if(map == null){
+			System.out.println("(OtoOLink): Null arg. passed to updateNetworkMap(map)");
+			System.exit(0);
+		}
+		//Update the network map to reflect this new link.
+		Node node1;
+		Node node2; 
+		if(map.containsNode(lsr1.getAddress())){
+			node1 = map.getNode(lsr1.getAddress());
+		}
+		else node1 = new Node(lsr1.getAddress());
+		if(map.containsNode(lsr2.getAddress())){
+			node2 = map.getNode(lsr2.getAddress());
+		}
+		else node2 = new Node(lsr2.getAddress());
+		
+		node1.addLink(linkCost,node2);
+		node2.addLink(linkCost,node1);
+		
+		map.addNode(node1);
+		map.addNode(node2);
+	}
+	
 	public LSRNIC getOtherNIC(LSRNIC current) {
 		if(current==r1NIC){
 			return r2NIC;
