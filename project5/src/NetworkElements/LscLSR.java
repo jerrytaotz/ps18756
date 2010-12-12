@@ -38,17 +38,17 @@ public class LscLSR extends LSR {
 	
 	/**
 	 * This method processes data and OAM cells that arrive from any nic with this router as a destination
-	 * @param currentPacket the packet that arrived at this router
+	 * @param p the packet that arrived at this router
 	 * @param nic the nic that the cell arrived on
 	 * @since 1.0
 	 * @override
 	 */
-	public void receivePacket(Packet currentPacket, LSRNIC nic){
+	public void receivePacket(Packet p, LSRNIC nic){
 		if(LSCControlLinks.contains(nic)){
-			this.processLSCControl(currentPacket, nic);
+			this.processLSCControl(p, nic);
 		}
 		else if(LSCDataLinks.contains(nic)){
-			this.processLSCData(currentPacket,nic);
+			this.processDataPacket(p,nic);
 		}
 		else{
 			errorPrint("Detected a nic which is not classified as LSCData, or LSCControl");
@@ -56,22 +56,28 @@ public class LscLSR extends LSR {
 		}
 	}
 	
-	public void processLSCData(Packet currentPacket,LSRNIC nic){
-		System.out.println("LSC Data packet: " + currentPacket.getSource() + ", " + currentPacket.getDest());
-		System.out.println("\tOAM: " + currentPacket.isOAM());
-		if (currentPacket.isOAM())
-		{
-			System.out.println("\tOAM: " + currentPacket.getOAMMsg() + ", " + currentPacket.getOpticalLabel().toString());
+	/**
+	 * Parse a message received on a control link to determine what type of control message it
+	 * was.  Passes control to the appropriate handler method.
+	 * @param currentPacket the received packet
+	 * @param nic the nic the packet was received on.
+	 */
+	public void processLSCControl(Packet p,LSRNIC nic){
+		if(p.getRSVPMsg().compareTo("PATH") == 0){
+			receivedPATH(p,nic);
 		}
+		//TODO fill in the details for the other message types
 	}
-	
-	public void processLSCControl(Packet currentPacket,LSRNIC nic){
-		System.out.println("LSC Control packet: " + currentPacket.getSource() + ", " + currentPacket.getDest());
-		System.out.println("\tOAM: " + currentPacket.isOAM());
-		if (currentPacket.isOAM())
-		{
-			System.out.println("\tOAM: " + currentPacket.getOAMMsg() + ", " + currentPacket.getOpticalLabel().toString());
-		}
+
+	/**
+	 * Processes a PATH message.
+	 * @param p the packet containing the PATH message
+	 * @param nic the nic p was received from
+	 */
+	private void receivedPATH(Packet p, LSRNIC nic) {
+		traceMsg("Received PATH message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest());
+		//TODO implement this method.
 	}
 
 	/**
@@ -138,6 +144,16 @@ public class LscLSR extends LSR {
 		System.out.println("(LSC Router " + this.getAddress() + "): ERROR " + errorMsg);
 	}
 	
+	/**
+	 * This method will be used to determine the outgoing NIC for a destination node
+	 * using it's destination address rather than an MPLS label.  This method should be 
+	 * used to forward messages on the control plane since labels will never be set up
+	 * for control paths.  It should also be used to determine the outgoing NIC for
+	 * label forwarding before the labelTable entry is created.
+	 * @param dest the destination node
+	 * @control true if you would like to find the control route to the destination
+	 * false if you would like to find the data route to the destination
+	 */
 	@Override
 	public LSRNIC getDestNICviaIP(int dest, boolean control) {
 		if(control){
@@ -154,5 +170,21 @@ public class LscLSR extends LSR {
 			}
 			return dataRoutingTable.get(dest);
 		}
+	}
+
+	/**
+	 * prints a user supplied trace message with the format (LSC Router <this.address>): <msg>
+	 * @param msg the message to be printed
+	 */
+	@Override
+	protected void traceMsg(String msg) {
+		System.out.println("(LSC Router " + this.address + "): " +msg);
+		
+	}
+
+	@Override
+	protected void setupLSPOnTheFly(Packet newPacket) {
+		// TODO Auto-generated method stub
+		
 	}
 }

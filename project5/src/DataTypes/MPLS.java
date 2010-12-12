@@ -1,7 +1,7 @@
 package DataTypes;
 
 public class MPLS {
-	private int label; // the MPLS label
+	private Label label; // the MPLS label
 	private int trafficclass; // the DiffServ traffic class
 	private int stackingbit=1; // 1 if last header. 0 otherwise
 	
@@ -12,7 +12,7 @@ public class MPLS {
 	 * @param stackingbit 1 if last header. 0 otherwise
 	 * @since 1.0
 	 */
-	public MPLS(int label, int trafficclass, int stackingbit){
+	public MPLS(Label label, int trafficclass, int stackingbit){
 		try{
 			this.label = label;
 			this.trafficclass = trafficclass;
@@ -28,7 +28,7 @@ public class MPLS {
 	 * @return the label of this MPLS header
 	 * @since 1.0
 	 */
-	public int getLabel(){
+	public Label getLabel(){
 		return this.label;
 	}
 	

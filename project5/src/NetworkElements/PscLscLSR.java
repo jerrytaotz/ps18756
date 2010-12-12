@@ -56,20 +56,28 @@ public class PscLscLSR extends LSR {
 	}
 	
 	/**
-	 * This method processes data and OAM cells that arrive from any nic with this router as a destination
-	 * @param currentPacket the packet that arrived at this router
+	 * This method processes data and OAM cells that arrive from any nic with this router as a 
+	 * destination.  
+	 * @param p the packet that arrived at this router
 	 * @param nic the nic that the cell arrived on
+	 * @remarks It is the responsibility of the programmer to ensure that any messages
+	 * which are transmitted to a PscLscLSR are in the appropriate format.  For example,
+	 * if a node will be sending a packet to a PSC interface, it should not have an 
+	 * optical Label.  Or, if an adjacent LSC router is forwarding a PSC data packet
+	 * to this router, it must not forward it to the control plane link but rather to the
+	 * data plane link.  Packets received on the control plane link will be assumed to be in
+	 * LSC format.
 	 * @since 1.0
 	 */
-	public void receivePacket(Packet currentPacket, LSRNIC nic){
+	public void receivePacket(Packet p, LSRNIC nic){
 		if(LSCControlLinks.contains(nic)){
-			this.processLSCControl(currentPacket, nic);
+			this.processLSCRSVP((rsvpPacket)p, nic);
 		}
 		else if(LSCDataLinks.contains(nic)){
-			this.processLSCData(currentPacket,nic);
+			this.processDataPacket(p,nic);
 		}
 		else if(PSCLinks.contains(nic)){
-			this.processPSCPacket(currentPacket, nic);
+			this.processPSCPacket(p, nic);
 		}
 		else{
 			errorPrint("Detected a nic which is not classified as PSC,LSCData, or LSCControl");
@@ -77,37 +85,71 @@ public class PscLscLSR extends LSR {
 		}
 	}
 	
+	/*
+	 * =============================================================================
+	 * PSC methods
+	 * =============================================================================
+	 */
+	
 	/**
 	 * Process a packet which was received on one of the PSC links.
 	 * @param currentPacket the received packet
 	 * @param nic the nic the packet was received on
 	 */
-	public void processPSCPacket(Packet currentPacket,LSRNIC nic){
-		System.out.println("PSC packet: " + currentPacket.getSource() + ", " + currentPacket.getDest());
-		System.out.println("\tOAM: " + currentPacket.isOAM());
-		if (currentPacket.isOAM())
-		{
-			System.out.println("\tOAM: " + currentPacket.getOAMMsg() + ", " + currentPacket.getOpticalLabel().toString());
+	private void processPSCPacket(Packet p,LSRNIC nic){
+		if(p.isRSVP()){
+			processPSCRSVP((rsvpPacket)p,nic);
+		}
+		else{
+			processDataPacket(p, nic);
 		}
 	}
 	
-	public void processLSCData(Packet currentPacket,LSRNIC nic){
-		System.out.println("LSC Data packet: " + currentPacket.getSource() + ", " + currentPacket.getDest());
-		System.out.println("\tOAM: " + currentPacket.isOAM());
-		if (currentPacket.isOAM())
-		{
-			System.out.println("\tOAM: " + currentPacket.getOAMMsg() + ", " + currentPacket.getOpticalLabel().toString());
+	/**
+	 * This method will parse a PSC RSVP method to determine the type of RSVP message and
+	 * pass control to the appropriate handler.
+	 * @param p the packet which was received
+	 * @param nic the nic on which this packet was received.
+	 */
+	private void processPSCRSVP(rsvpPacket p, LSRNIC nic) {
+		if(p.getType().compareTo("PATH") == 0){
+			receivedPSCPATH((PATHMsg)p,nic);
 		}
+		//TODO add cases for the other messages.
 	}
-	public void processLSCControl(Packet currentPacket,LSRNIC nic){
-		System.out.println("LSC Control packet: " + currentPacket.getSource() + ", " + currentPacket.getDest());
-		System.out.println("\tOAM: " + currentPacket.isOAM());
-		if (currentPacket.isOAM())
-		{
-			System.out.println("\tOAM: " + currentPacket.getOAMMsg() + ", " + currentPacket.getOpticalLabel().toString());
+
+	/**
+	 * Processes a PSC PATH message.
+	 * @param p
+	 * @param nic
+	 */
+	private void receivedPSCPATH(PATHMsg p, LSRNIC nic){
+		traceMsg("Received PSC PATH message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest());
+	}
+	/*
+	 * ==========================================================================
+	 * LSC methods
+	 * ==========================================================================
+	 */
+	
+	/**
+	 * Determines what type of control message was received and forwards it to the appropriate
+	 * handler.
+	 */
+	private void processLSCRSVP(rsvpPacket p,LSRNIC nic){
+		if(p.getRSVPMsg().compareTo("PATH") == 0){
+			receivedLSCPATH((PATHMsg)p,nic);
 		}
+		//TODO add cases for the other messages
 	}
 	
+	private void receivedLSCPATH(PATHMsg p, LSRNIC nic) {
+		traceMsg("Received LSC PATH message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest());
+		//TODO implement this method
+	}
+
 	/**
 	 * Updates the routing tables in this router using
 	 * Dijkstra's algorithm.
@@ -170,14 +212,32 @@ public class PscLscLSR extends LSR {
 	}
 	
 	/**
+	 * prints a user supplied trace message with the format (PSC+LSC Router <this.address>): <msg>
+	 * @param msg the message to be printed
+	 */
+	protected void traceMsg(String msg){
+		System.out.println("(LSC+PSC Router " + this.address + "): " +msg);
+	}
+	
+	/**
 	 * Print an error message containing the type of this LSR and it's address.
 	 * @param errorMsg the error message you would like printed.
 	 */
 	@Override
 	public void errorPrint(String errorMsg){
-		System.out.println("(PSC/LSC Router " + this.getAddress() + "): ERROR " + errorMsg);
+		traceMsg("ERROR " + errorMsg);
 	}
 
+	/**
+	 * This method will be used to determine the outgoing NIC for a destination node
+	 * using it's destination address rather than an MPLS label.  This method should be 
+	 * used to forward messages on the control plane since labels will never be set up
+	 * for control paths.  It should also be used to determine the outgoing NIC for
+	 * label forwarding before the labelTable entry is created.
+	 * @param dest the destination node
+	 * @control true if you would like to find the control route to the destination
+	 * false if you would like to find the data route to the destination
+	 */
 	@Override
 	public LSRNIC getDestNICviaIP(int dest, boolean control) {
 		if(control){
@@ -194,6 +254,12 @@ public class PscLscLSR extends LSR {
 			}
 			return dataRoutingTable.get(dest);
 		}
+	}
+
+	@Override
+	protected void setupLSPOnTheFly(Packet newPacket) {
+		// TODO Auto-generated method stub
+		
 	}
 	
 }

@@ -9,6 +9,8 @@ public abstract class LSR{
 	protected int address; // The AS address of this router
 	protected ArrayList<LSRNIC> nics; // all of the nics in this router
 	protected PathCalculator pc;
+	protected LabelTable labelTable;
+	protected ArrayList<Packet> waitingPackets; //where to queue up packets waiting for an LSP
 	
 	/**
 	 * The default constructor for an ATM router
@@ -19,6 +21,8 @@ public abstract class LSR{
 		this.address = address;
 		nics = new ArrayList<LSRNIC>();
 		pc = new PathCalculator();
+		labelTable = new LabelTable();
+		waitingPackets = new ArrayList<Packet>();
 	}
 	
 	/**
@@ -53,14 +57,7 @@ public abstract class LSR{
 	 * @param nic the nic that the cell arrived on
 	 * @since 1.0
 	 */
-	public void receivePacket(Packet currentPacket, LSRNIC nic){
-		System.out.println("packet: " + currentPacket.getSource() + ", " + currentPacket.getDest());
-		System.out.println("\tOAM: " + currentPacket.isOAM());
-		if (currentPacket.isOAM())
-		{
-			System.out.println("\tOAM: " + currentPacket.getOAMMsg() + ", " + currentPacket.getOpticalLabel().toString());
-		}
-	}
+	abstract public void receivePacket(Packet currentPacket, LSRNIC nic);
 	
 	/**
 	 * This method creates a packet with the specified type of service field and sends it to a destination
@@ -71,17 +68,40 @@ public abstract class LSR{
 		Packet newPacket= new Packet(this.getAddress(), destination);
 		this.sendPacket(newPacket);
 	}
-	
+
 	/**
-	 * This method forwards a packet to the correct nic or drops if at destination router
+	 * This method is used to send packets across the data plane.  If an LSP does not exist at
+	 * the time of transmission, one will be automatically created by sendPacket().  Until the
+	 * RESV message has been received at this router, all packets will be queued.  Once the
+	 * RESV message is received, all packets will be immediately transmitted.
 	 * @param newPacket The packet that has just arrived at the router.
 	 * @since 1.0
 	 */
 	public void sendPacket(Packet newPacket) {
-		
-		//This method should send the packet to the correct NIC (and wavelength if LSC router).
+		LSRNIC forwardNIC;
+		NICLabelPair newOutPair;
+		Label outLabel;
+		MPLS header;
 
-		
+		//This method should send the packet to the correct NIC.
+		if(!labelTable.containsLSP(newPacket.getDest())){
+			//NO LSP! Set one up on the fly.
+			setupLSPOnTheFly(newPacket);
+		}
+		else if(labelTable.getOutPair(newPacket.getDest()).getLabel().isPending()){
+			/*We are waiting on a RESV message for this LSP.  Just queue up until it's received*/
+			waitingPackets.add(newPacket);
+		}
+		else{
+			/*send the new packet*/
+			forwardNIC = labelTable.getOutPair(newPacket.getDest()).getNIC();
+			outLabel = labelTable.getOutPair(newPacket.getDest()).getLabel();
+			header = new MPLS(outLabel,0,1);
+			newPacket.addMPLSheader(header);
+			forwardNIC.sendPacket(newPacket, this);
+			//sentData(newPacket);
+		}
+
 	}
 
 	/**
@@ -106,6 +126,18 @@ public abstract class LSR{
 	}
 	
 	/**
+	 * Will either store or forward a data packet received on the data plane.
+	 * @param p the data packet
+	 * @param nic the LSRNIC this packet was received on.
+	 */
+	public void processDataPacket(Packet p,LSRNIC nic){
+		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest());
+		//TODO implement a check to see if the LSP has been set up yet
+		//TODO fill in the details of how to store/forward messages
+	}
+	
+	/**
 	 * Makes each nic move all of its cells from the input buffer to the output buffer
 	 * @since 1.0
 	 */
@@ -116,9 +148,23 @@ public abstract class LSR{
 	
 	public void sendKeepAlive(int dest, OpticalLabel label){
 			Packet p = new Packet(this.getAddress(), dest, label);
-			p.setOAM(true, "KeepAlive");
+			p.setRSVP(true, "KeepAlive");
 			this.sendPacket(p);
 	}
+	
+	/**
+	 * Print a notification 
+	 * @param pathMsg
+	 */
+	protected void sentPATH(PATHMsg pathMsg) {
+		traceMsg("Sent PATH message to " + pathMsg.getDest() + " : " + pathMsg.getId());
+	}
+	
+	/**
+	 * Sets up a new LSP to the destination contained in 'newPacket'
+	 * @param newPacket the packet for which we need a new LSP
+	 */
+	abstract protected void setupLSPOnTheFly(Packet newPacket);
 	
 	/**
 	 * A method to test whether or not the IP routing tables are working correctly
@@ -135,4 +181,11 @@ public abstract class LSR{
 	 * @param errorMsg
 	 */
 	abstract protected void errorPrint(String errorMsg);
+	
+	/**
+	 * Prints a user supplied trace message containing the concrete type of the router.
+	 * Should be used to print all log messages.
+	 * @param msg the user supplied message
+	 */
+	abstract protected void traceMsg(String msg);
 }
