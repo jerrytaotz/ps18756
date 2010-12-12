@@ -2,14 +2,16 @@ package DataTypes;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Random;
 
 public class Packet {
-	private int source, dest, DSCP; // The source and destination addresses
-	private boolean OAM = false;
-	private String OAMMsg = null; 
+	protected int source, dest, DSCP; // The source and destination addresses
+	protected boolean RSVP = false;
+	protected String type; //used to classify the various types of packets
+	private String RSVPMsg = null; 
+	private int id;
 	private OpticalLabel opticalLabel = OpticalLabel.NA;
 	private Queue<MPLS> MPLSheader = new LinkedList<MPLS>(); // all of the MPLS headers in this router
-	
 	/**
 	 * The default constructor for a packet
 	 * @param source the source ip address of this packet
@@ -20,6 +22,8 @@ public class Packet {
 		try{
 			this.source = source;
 			this.dest = dest;
+			Random rand = new Random();
+			id = rand.nextInt(1000);
 		}
 		catch(Exception e){
 			e.printStackTrace();
@@ -99,17 +103,47 @@ public class Packet {
 		return opticalLabel;
 	}
 
-	public boolean isOAM() {
-		return OAM;
+	public boolean isRSVP() {
+		return RSVP;
 	}
 
-	public void setOAM(boolean oAM, String msg) {
-		OAM = oAM;
-		OAMMsg = msg;
+	public void setRSVP(boolean rsvp, String msg) {
+		this.RSVP = rsvp;
+		RSVPMsg = msg;
 	}
 
-	public String getOAMMsg() {
-		return OAMMsg;
+	public String getRSVPMsg() {
+		return RSVPMsg;
+	}
+	
+	/**
+	 * Get the value stored in this packet's ID field.
+	 * @return this packet's id
+	 */
+	public int getId(){
+		return this.id;
+	}
+	
+	/**
+	 * @return the type
+	 */
+	public String getType() {
+		return type;
+	}
+
+	/**
+	 * @param type the type to set
+	 */
+	public void setType(String type) {
+		this.type = type;
+	}
+
+	/**
+	 * set this packet's ID field
+	 * @param id the new ID
+	 */
+	public void setId(int id){
+		
 	}
 
 }

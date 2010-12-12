@@ -51,8 +51,7 @@ public class LSRNIC {
 		}
 		
 		
-		parent.sendPacket(currentPacket);
-		
+		this.outputBuffer.add(currentPacket);
 	}
 	
 	/**

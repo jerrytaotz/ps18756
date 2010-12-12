@@ -125,12 +125,35 @@ public class TestNet1 {
 		lsrE.updateRoutingTable(dataMap, controlMap);
 		lsrF.updateRoutingTable(dataMap, controlMap);
 		lsrG.updateRoutingTable(dataMap);
+		
+		allConsumers.add(lsrA);
+		allConsumers.add(lsrB);
+		allConsumers.add(lsrC);
+		allConsumers.add(lsrD);
+		allConsumers.add(lsrE);
+		allConsumers.add(lsrF);
+		allConsumers.add(lsrG);
+		
 	}
 
 	@After
 	public void tearDown() throws Exception {
 	}
 
+	public void tock(){
+		System.out.println("** TIME = " + time + " **");
+		time++;		
+		
+		// Send packets between routers
+		for(int i=0; i<this.allConsumers.size(); i++)
+			allConsumers.get(i).sendPackets();
+
+		// Move packets from input buffers to output buffers
+		for(int i=0; i<this.allConsumers.size(); i++)
+			allConsumers.get(i).receivePackets();
+		
+	}
+	
 	/**
 	 * Tests whether the dijkstra's algorithm code will work for both the data plane and
 	 * the control plane going from left to right.
@@ -170,4 +193,16 @@ public class TestNet1 {
 		Assert.assertTrue(lsrB.getDestNICviaIP(1, true).getId().compareTo("lsrBlsrA") == 0);
 		Assert.assertTrue(lsrB.getDestNICviaIP(1, false).getId().compareTo("lsrBlsrA") == 0);
 	}
+	
+	/**
+	 * For now this method will test the createPacket method of a PSC to make sure
+	 * it properly initiates the PATH message sequence.
+	 */
+	@Test
+	public void testPATHInit(){
+		lsrA.createPacket(7);
+		this.tock();
+		this.tock();
+	}
+	
 }
