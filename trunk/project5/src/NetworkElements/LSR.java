@@ -130,12 +130,7 @@ public abstract class LSR{
 	 * @param p the data packet
 	 * @param nic the LSRNIC this packet was received on.
 	 */
-	public void processDataPacket(Packet p,LSRNIC nic){
-		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
-				" to:" + p.getDest());
-		//TODO implement a check to see if the LSP has been set up yet
-		//TODO fill in the details of how to store/forward messages
-	}
+	abstract protected void processDataPacket(Packet p,LSRNIC nic);
 	
 	/**
 	 * Makes each nic move all of its cells from the input buffer to the output buffer
@@ -157,7 +152,18 @@ public abstract class LSR{
 	 * @param pathMsg
 	 */
 	protected void sentPATH(PATHMsg pathMsg) {
-		traceMsg("Sent PATH message to " + pathMsg.getDest() + " : " + pathMsg.getId());
+		traceMsg("Sent PATH message " + pathMsg.getId() + " to " 
+				+ pathMsg.getDest());
+	}
+	
+	/**
+	 * Prints an error message and terminates application if a control packet was
+	 * received for which there was no IP route.
+	 * @param p the offending packet
+	 */
+	protected void noIPPath(Packet p){
+		errorPrint("Error on PATH message (no IP route to " + p.getDest());
+		System.exit(1);
 	}
 	
 	/**

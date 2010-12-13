@@ -84,6 +84,23 @@ public class Label {
 		this.lspPending = pending;
 	}
 	
+	/**
+	 * Make a deep copy of this label
+	 */
+	@Override
+	public Label clone(){
+		Label cloneLabel;
+		if(this.isOpticalLabel){
+			cloneLabel = new Label(this.oLabel);
+			cloneLabel.setIsPending(this.lspPending);
+		}
+		else{
+			cloneLabel = new Label(this.label);
+			cloneLabel.setIsPending(this.lspPending);
+		}
+		return cloneLabel;
+	}
+	
 	@Override
 	public String toString(){
 		if(this.isOpticalLabel){

@@ -41,6 +41,8 @@ public class Packet {
 			this.source = source;
 			this.dest = dest;
 			this.opticalLabel = label;
+			Random rand = new Random();
+			id = rand.nextInt(1000);
 		}
 		catch(Exception e){
 			e.printStackTrace();
@@ -143,7 +145,7 @@ public class Packet {
 	 * @param id the new ID
 	 */
 	public void setId(int id){
-		
+		this.id = id;
 	}
 
 }
