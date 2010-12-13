@@ -41,9 +41,26 @@ public class LabelTable {
 	 * @param inLabel the input label you are interested in.
 	 * @return the corresponding NICLabelPair, null if one did not exist for inLabel
 	 */
-	public NICLabelPair get(Label inLabel){
+	public NICLabelPair getWithInLabel(Label inLabel){
 		for(ltEntry e:entries){
 			if(e.getInLabel().equals(inLabel)){
+				return e.getNLPair();
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Get a NICLabel pair for a specific output label.  Transmitting nodes should use this
+	 * version of the function since the input label will be unique across all NICS.  Other
+	 * methods should use the version which also takes a NIC since labels may not be
+	 * unique across all nics.
+	 * @param outLabel the input label you are interested in.
+	 * @return the corresponding NICLabelPair, null if one did not exist for inLabel
+	 */
+	public NICLabelPair getWithOutLabel(Label outLabel){
+		for(ltEntry e:entries){
+			if(e.getNLPair().getLabel().equals(outLabel)){
 				return e.getNLPair();
 			}
 		}
@@ -69,9 +86,10 @@ public class LabelTable {
 	 * @param inLabel the input label you are interested in.
 	 * @return the corresponding NICLabelPair, null if one did not exist for inLabel
 	 */
-	public NICLabelPair get(Label inLabel,LSRNIC nic){
+	public NICLabelPair get(Label outLabel,LSRNIC nic){
 			for(ltEntry e:entries){
-				if((e.getNLPair().getNIC() == nic) && e.getInLabel().equals(inLabel)){
+				if((e.getNLPair().getNIC() == nic) && 
+						e.getNLPair().getLabel().equals(outLabel)){
 					return e.getNLPair();
 				}
 			}
@@ -154,6 +172,23 @@ public class LabelTable {
 			}
 		}
 		return outLabelList;
+	}
+	
+	/**
+	 * Returns the output pair containing the optical label.
+	 * For use in LSC+PSC routers only.
+	 * @param inLabel the input label you want to retrieve the outpair for
+	 * @return the optical output pair corresponding to inLabel
+	 * null if one does not exist
+	 */
+	public NICLabelPair getOpticalOutPair(Label inLabel){
+		for(ltEntry e:entries){
+			if(e.getInLabel().equals(inLabel) &&
+					e.getNLPair().getLabel().isOptical()){
+				return e.nlPair;
+			}
+		}
+		return null;
 	}
 	
 	/**

@@ -157,15 +157,12 @@ public class PscLSR extends LSR {
 		Label upstreamLabel,downStreamInLabel,downStreamOutLabel;
 		LSRNIC forwardNIC;
 		int dest = newPacket.getDest();
-		PATHMsg pathMsg = new PATHMsg(this.address,dest);
-		
-		//Place a new PATH message in the output buffer
-		sentPATH(pathMsg);
-		pathMsg.addPrevHop(this.address);
+		PATHMsg pathMsg;
 		forwardNIC = this.routingTable.get(dest);
-		if(forwardNIC != null) forwardNIC.sendPacket(pathMsg,this);
-		else System.out.println("Router " + this.address + " tried to setup LSP to address " +
-				dest + " which is not in its routing table.");
+		
+		if(forwardNIC == null){
+			noIPPath(newPacket);
+		}
 		
 		/*Add the new upstream Label Table Entry*/
 		upstreamLabel = new Label(calcInLabel());
@@ -185,9 +182,28 @@ public class PscLSR extends LSR {
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + downStreamInLabel +
 				"\\" + dest + "\\" + downStreamOutLabel);
 		
+		//Place a new PATH message in the output buffer
+		pathMsg = new PATHMsg(this.address, dest, upstreamLabel.clone(),
+				downStreamOutLabel.clone());
+		sentPATH(pathMsg);
+		pathMsg.addPrevHop(this.address);
+		forwardNIC.sendPacket(pathMsg,this);
+		
 		/*enqueue the packet which triggered the LSP setup.*/
 		waitingPackets.add(newPacket);
 		
 	}
 
+	/**
+	 * Will either store or forward a data packet received on the data plane.
+	 * @param p the data packet
+	 * @param nic the LSRNIC this packet was received on.
+	 */
+	public void processDataPacket(Packet p,LSRNIC nic){
+		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest());
+		//TODO implement a check to see if the LSP has been set up yet
+		//TODO fill in the details of how to store/forward messages
+	}
+	
 }
