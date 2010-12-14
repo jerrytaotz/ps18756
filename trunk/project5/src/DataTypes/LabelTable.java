@@ -15,7 +15,7 @@ import NetworkElements.LSRNIC;
 public class LabelTable {
 
 	private ArrayList<ltEntry> entries = new ArrayList<ltEntry>();
-	
+
 	/**
 	 * Determine whether or not a label already exists for the specified source/dest. LSRs
 	 * @param source the address of the LSR which is the source of traffic
@@ -49,7 +49,7 @@ public class LabelTable {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Get a NICLabel pair for a specific output label.  Transmitting nodes should use this
 	 * version of the function since the input label will be unique across all NICS.  Other
@@ -66,7 +66,7 @@ public class LabelTable {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Get a NICLabel pair for a specific destination.
 	 * @param dest the destination you are interested in.
@@ -80,22 +80,22 @@ public class LabelTable {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Get a NICLabel pair for a specific input label.
 	 * @param inLabel the input label you are interested in.
 	 * @return the corresponding NICLabelPair, null if one did not exist for inLabel
 	 */
 	public NICLabelPair get(Label outLabel,LSRNIC nic){
-			for(ltEntry e:entries){
-				if((e.getNLPair().getNIC() == nic) && 
-						e.getNLPair().getLabel().equals(outLabel)){
-					return e.getNLPair();
-				}
+		for(ltEntry e:entries){
+			if((e.getNLPair().getNIC() == nic) && 
+					e.getNLPair().getLabel().equals(outLabel)){
+				return e.getNLPair();
 			}
+		}
 		return null;
 	}
-	
+
 	/**
 	 * Insert a new row into this table.
 	 * @param source the transmitting end of the LSP
@@ -108,9 +108,9 @@ public class LabelTable {
 		/*Add the entry to the table*/
 		ltEntry newEntry = new ltEntry(source, dest, inLabel, nlPair);
 		entries.add(newEntry);
-		
+
 	}
-	
+
 	/**
 	 * Returns the input label for a given source/destination pair.
 	 * @param source the transmitting end of the LSP
@@ -125,7 +125,7 @@ public class LabelTable {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Determine whether or not a specific inLabel is in this table.
 	 * @param inLabel the label to be queried for
@@ -141,7 +141,7 @@ public class LabelTable {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Determine whether an integer input label is already present in the table.
 	 * @param inLabel the label to be queried for
@@ -159,7 +159,7 @@ public class LabelTable {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Returns an array list containing all of the output labels associated with 'nic'
 	 * @param nic the nic you want to find the output labels for.
@@ -173,7 +173,7 @@ public class LabelTable {
 		}
 		return outLabelList;
 	}
-	
+
 	/**
 	 * Returns the output pair containing the optical label.
 	 * For use in LSC+PSC routers only.
@@ -186,6 +186,43 @@ public class LabelTable {
 			if(e.getInLabel().equals(inLabel) &&
 					e.getNLPair().getLabel().isOptical()){
 				return e.nlPair;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the output pair containing the integral label.
+	 * For use in LSC+PSC routers only.
+	 * @param the destination for which you would like to find the output pair.
+	 * @return the optical output pair corresponding to dest
+	 * null if one does not exist
+	 */
+	public NICLabelPair getPSCOutPairWithDest(int dest){
+		for(ltEntry e:entries){
+			if(e.getNLPair() != null){
+				if(e.getDest() == dest &&
+						!e.getNLPair().getLabel().isOptical()){
+					return e.nlPair;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the output pair containing the integral label.
+	 * @param inLabel the input label for which you would like to find the output pair.
+	 * @return the optical output pair corresponding to dest
+	 * null if one does not exist
+	 */
+	public NICLabelPair getPSCOutPairWithLabel(Label inLabel){
+		for(ltEntry e:entries){
+			if(e.getNLPair() != null){
+				if(e.getNLPair().getLabel().equals(inLabel) &&
+						!e.getNLPair().getLabel().isOptical()){
+					return e.nlPair;
+				}
 			}
 		}
 		return null;
@@ -204,7 +241,7 @@ public class LabelTable {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Delete the row in the label table corresponding to the specified source and dest
 	 * @param source the source node
@@ -227,8 +264,16 @@ public class LabelTable {
 			return false;
 		}
 	}
-	
-	
+
+	@Override
+	public String toString(){
+		String tableString = "";
+		for(ltEntry e:entries){
+			tableString.concat("in: " + e.getInLabel()+" out: " + e.getNLPair().getLabel() + "\n");
+		}
+		return tableString;
+	}
+
 	/**
 	 * A private class which represents a row in the table.
 	 * @author Brady
@@ -238,7 +283,7 @@ public class LabelTable {
 		private int dest;
 		private Label inLabel;
 		private NICLabelPair nlPair;
-		
+
 		/**
 		 * Create a new row in the label table.
 		 * @param source 
@@ -252,7 +297,7 @@ public class LabelTable {
 			this.inLabel = inLabel;
 			this.nlPair = nlPair;
 		}
-		
+
 		/**
 		 * =============================
 		 * accessors and mutators
@@ -261,15 +306,15 @@ public class LabelTable {
 		public int getSource(){
 			return this.source;
 		}
-		
+
 		public int getDest(){
 			return this.dest;
 		}
-		
+
 		public Label getInLabel(){
 			return this.inLabel;
 		}
-		
+
 		public NICLabelPair getNLPair(){
 			return this.nlPair;
 		}

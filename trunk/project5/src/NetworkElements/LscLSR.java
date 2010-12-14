@@ -118,6 +118,7 @@ public class LscLSR extends LSR {
 		NICLabelPair upPair, downPair;
 		LSRNIC forwardNIC = controlRoutingTable.get(p.getDest());
 		LSRNIC dataForwardNIC  = dataRoutingTable.get(p.getDest());
+		LSRNIC dataUpNIC = dataRoutingTable.get(p.getSource());
 		PATHMsg pathMsg;
 		boolean lambdaAvailable = false;
 		
@@ -144,7 +145,7 @@ public class LscLSR extends LSR {
 		
 		/*Add the upstream entry to the table*/
 		upstreamIn = new Label(p.getUL().getOptVal());
-		upPair = new NICLabelPair(nic, p.getUL().clone());
+		upPair = new NICLabelPair(dataUpNIC, p.getUL().clone());
 		labelTable.put(p.getDest(),p.getSource(),upstreamIn,upPair);
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + upstreamIn +
 				"\\" + p.getSource() + "\\" + upPair.getLabel());
@@ -306,15 +307,6 @@ public class LscLSR extends LSR {
 	}
 	
 	/**
-	 * Print a confirmation message that a RESV message was sent.
-	 * @param resv the RESV message itself
-	 */
-	private void sentRESV(RESVMsg resv) {
-		traceMsg("Sent RESV message " + resv.getId() + " from:" + resv.getSource() +
-				"to:"+ resv.getDest() + " DL:" + resv.getDL());
-	}
-
-	/**
 	 * Will forward a data packet received on the data plane.
 	 * @param p the data packet
 	 * @param nic the LSRNIC this packet was received on.
@@ -325,15 +317,15 @@ public class LscLSR extends LSR {
 		LSRNIC forwardNIC;
 		
 		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
-				" to:" + p.getDest());
+				" to:" + p.getDest() + " on " + pLabel + " channel.");
 		/*check to see if the LSP has been set up yet*/
-		forwardPair = labelTable.getWithInLabel(pLabel);
+		forwardPair = labelTable.getOpticalOutPair(pLabel);
 		if(forwardPair != null){
 			/*LSP exists.  Forward the packet*/
 			forwardNIC = forwardPair.getNIC();
 			forwardNIC.sendPacket(p, this);
 			traceMsg("Sent DATA packet " + p.getId() + " from:" + p.getSource() + 
-					" to:" + p.getDest());
+					" to:" + p.getDest() + " on " + pLabel + " channel.");
 		}
 		else{
 			errorPrint("Received a packet for a non existing LSP");

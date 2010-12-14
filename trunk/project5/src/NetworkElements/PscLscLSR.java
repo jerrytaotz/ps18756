@@ -119,7 +119,74 @@ public class PscLscLSR extends LSR {
 		if(p.getType().compareTo("PATH") == 0){
 			processPSCPATH((PATHMsg)p,nic);
 		}
-		//TODO add cases for the other messages.
+		if(p.getType().equals("RESV")){
+			processPSCRESV((RESVMsg)p,nic);
+		}
+	}
+	
+	/**
+	 * Processes a RESV message originating from a PSC link by forwarding it across the LSC data
+	 * plane.
+	 * @param p the RESV message which was received
+	 * @param nic the NIC from which 'p' was received
+	 */
+	private void processPSCRESV(RESVMsg p, LSRNIC nic) {
+		RESVMsg lscResv;
+		LSRNIC lscForwardNIC = dataRoutingTable.get(p.getDest());
+		Label upInLabel = labelTable.getInLabel(p.getSource(), p.getDest());
+		NICLabelPair upOutPair = labelTable.getOpticalOutPair(upInLabel);
+		OpticalLabel lscForwardLabel = upOutPair.getLabel().getOptVal();
+		
+		traceMsg("Received PSC RESV message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest() + " DL:" + p.getDL());
+		
+		/*confirm the downstream label*/
+		labelTable.getPSCOutPairWithDest(p.getSource()).setLabel(p.getDL());
+
+		if(p.getDest() == this.address){
+			traceMsg("Terminated RESV Msg " + p.getId());
+			
+		}
+		else{
+			/*create an LSC RESV message and forward it*/
+			lscResv = new RESVMsg(p,lscForwardLabel);
+			lscForwardNIC.sendPacket(lscResv, this);
+			sentRESV(lscResv);
+		}
+		
+	}
+
+	/**
+	 * Processes a RESV message originating from a PSC link by forwarding it across the LSC data
+	 * plane.
+	 * @param p the RESV message which was received
+	 * @param nic the NIC from which 'p' was received
+	 */
+	private void processPSCRESVFromLSC(RESVMsg p, LSRNIC nic) {
+		RESVMsg resvMsg;
+		Label downInLabel = labelTable.getInLabel(p.getDest(), p.getSource());
+		NICLabelPair upOutPair = labelTable.getPSCOutPairWithDest(p.getDest());
+		LSRNIC pscForwardNIC = upOutPair.getNIC();
+
+		
+		traceMsg("Received PSC RESV message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest() + " DL:" + p.getDL());
+		
+		/*confirm the downstream label*/
+		labelTable.getPSCOutPairWithDest(p.getSource()).setLabel(p.getDL());
+
+		if(p.getDest() == this.address){
+			traceMsg("Terminated RESV Msg " + p.getId());
+			
+		}
+		else{
+			/*create a PSC RESV message and forward it*/
+			resvMsg = new RESVMsg(p.getSource(),p.getDest(),downInLabel);
+			resvMsg.setId(p.getId());
+			pscForwardNIC.sendPacket(resvMsg, this);
+			sentRESV(resvMsg);
+		}
+		
 	}
 	
 	/**
@@ -177,7 +244,7 @@ public class PscLscLSR extends LSR {
 	}
 	
 	/**
-	 * Processes a PSC PATH message.
+	 * Processes a PATH message received on a PSC only link.
 	 * @param p
 	 * @param nic
 	 */
@@ -190,7 +257,7 @@ public class PscLscLSR extends LSR {
 		PATHMsg pathMsg;
 		
 		traceMsg("Received PSC PATH message " + p.getId() + " from:" + p.getSource() + 
-				" to:" + p.getDest() + " UL: " + p.getUL() + " SL: " + p.getSL());
+				" to:" + p.getDest() + " UL: " + p.getUL());
 				
 		if(forwardNIC == null || dataForwardNIC == null){
 			noIPPath(p);
@@ -223,13 +290,13 @@ public class PscLscLSR extends LSR {
 		"\\" + p.getSource() + "\\PSI");
 		
 		/*add the downstream entry to the label table*/
-		downStreamIn = p.getSL().clone();
+		downStreamIn = new Label(calcIntInLabel()); //calculate downIn, wait for PSC downOut from RESV
 		downPair = new NICLabelPair(dataForwardNIC,downstreamOut);
 		labelTable.put(p.getSource(),p.getDest(),downStreamIn,downPair);
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: PSI" +
 				"\\" + p.getDest() + "\\" + downPair.getLabel());
 		
-		/*Forward the PATH message to the appropriate output buffer*/
+		/*Forward the LSC PATH message to the appropriate output buffer*/
 		pathMsg = new PATHMsg(p.getSource(),p.getDest(),
 				upstreamIn.clone(),downPair.getLabel().clone());
 		pathMsg.setPrevHops((ArrayList<Integer>)p.getPrevHops().clone());
@@ -237,6 +304,46 @@ public class PscLscLSR extends LSR {
 		pathMsg.setId(p.getId());
 		sentPATH(pathMsg);
 		forwardNIC.sendPacket(pathMsg,this);
+	}
+	
+	/**
+	 * Processes a PSC level PATH message received on the LSC control channel
+	 * @param p the PATH message
+	 * @param nic the nice the message was received from
+	 */
+	private void processPSCPATHFromLSC(PATHMsg p,LSRNIC nic){
+		Label upOutLabel = p.getUL();
+		Label upInLabel = labelTable.getInLabel(p.getDest(), p.getSource());
+		Label downInLabel = new Label(calcIntInLabel());
+		Label downOutLabel = new Label(Label.RESV_PENDING);
+		downOutLabel.setIsPending(true);
+		LSRNIC forwardNIC = controlRoutingTable.get(p.getDest());
+		NICLabelPair downOutPair = new NICLabelPair(forwardNIC,downOutLabel);
+		NICLabelPair upOutPair = new NICLabelPair(nic,upOutLabel);
+		PATHMsg pathMsg;
+		
+		traceMsg("Received PSC PATH message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest() + " UL: " + p.getUL());
+		
+		if(p.getDest() == this.address){
+			//TODO add an entry with the output label as null
+		}
+		else{
+			/*add the upstream entry*/
+			labelTable.put(p.getSource(), p.getDest(), upInLabel, upOutPair);
+			System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + upInLabel +
+					"\\" + p.getSource() + "\\" + upOutLabel);
+			/*add the downstream entry*/
+			labelTable.put(p.getDest(), p.getSource(), downInLabel, downOutPair);
+			System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + downInLabel +
+					"\\" + p.getDest() + "\\RESV Pending");
+			
+			/*Generate and forward new PATH message*/
+			pathMsg = new PATHMsg(p.getSource(),p.getDest(),upInLabel);
+			pathMsg.setId(p.getId());
+			forwardNIC.sendPacket(pathMsg, this);
+			sentPATH(pathMsg);
+		}
 	}
 	/*
 	 * ==========================================================================
@@ -264,7 +371,7 @@ public class PscLscLSR extends LSR {
 	 * @param nic the nic on which 'p' was received
 	 */
 	private void processLSCRESV(RESVMsg p, LSRNIC nic) {
-		Label dl = p.getDL(),pscUpLabel,pscDownOutLabel,pscDownInLabel;
+		Label dl = p.getDL(),pscUpInputLabel,pscDownOutLabel,pscDownInLabel;
 		NICLabelPair lscDownPair,pscUpPair,pscDownPair;
 		PATHMsg pscPathMsg;
 		LSRNIC pscPathNIC;
@@ -282,31 +389,32 @@ public class PscLscLSR extends LSR {
 		/*confirm the LSC DL*/
 		lscDownPair = labelTable.getWithOutLabel(dl);
 		lscDownPair.getLabel().setIsPending(false);
-		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: LSI" +
+		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: PSI" +
 				"\\" + p.getSource() + "\\" + lscDownPair.getLabel());
+		traceMsg("LSC PATH established. Forwarding PSC PATH.");
 		
 		/*Now the PSC side needs to forward a PSC PATH on the data plane*/
 		/*Create new PSC upstream entry*/
 		pscUpPair = labelTable.getOutPair(p.getDest());
-		pscUpLabel = new Label(calcIntInLabel());
-		pscUpLabel.setIsPending(false);
-		labelTable.put(p.getSource(), p.getDest(), pscUpLabel, pscUpPair);
-		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + pscUpLabel +
+		pscUpInputLabel = new Label(calcIntInLabel());
+		pscUpInputLabel.setIsPending(false);
+		labelTable.put(p.getSource(), p.getDest(), pscUpInputLabel, pscUpPair);
+		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + pscUpInputLabel +
 				"\\" + p.getDest() + "\\" + pscUpPair.getLabel());
 		
 		/*Create new PSC downstream entry*/
 		pscPathNIC = lscDownPair.getNIC();
 		pscDownInLabel = labelTable.getInLabel(p.getDest(),p.getSource());
-		pscDownOutLabel = new Label(calcIntOutLabel(pscPathNIC));
+		pscDownOutLabel = new Label(Label.RESV_PENDING);
 		pscDownOutLabel.setIsPending(true); //the PSC downstream labels are not confirmed yet
 		pscDownPair = new NICLabelPair(lscDownPair.getNIC(),pscDownOutLabel);
 		labelTable.put(p.getDest(), p.getSource(), pscDownInLabel , pscDownPair);
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + pscDownInLabel +
-				"\\" + p.getSource() + "\\" + pscDownPair.getLabel());
+				"\\" + p.getSource() + "\\RESV Pending");
 		
-		/*Create a LSC capable PATH message containing the new labels*/
+		/*Create an LSC capable PATH message containing the new labels*/
 		pscPathMsg = new PATHMsg(p.getDest(),p.getSource(),
-				lscDownPair.getLabel().getOptVal(),pscUpLabel,pscDownOutLabel);	
+				lscDownPair.getLabel().getOptVal(),pscUpInputLabel);	
 		pscPathNIC.sendPacket(pscPathMsg, this);
 		sentPATH(pscPathMsg);
 	}
@@ -339,11 +447,8 @@ public class PscLscLSR extends LSR {
 		p.getUL().setIsPending(false);
 		p.getSL().setIsPending(false);
 		
-		/*1. add the upstream+downstream entries to the label table*/
-		upstreamIn = new Label(calcIntInLabel());
-		
 		/*Add the upstream entry to the table*/
-		upstreamIn = new Label(p.getUL().getOptVal());
+		upstreamIn = new Label(calcIntInLabel());
 		upPair = new NICLabelPair(nic, p.getUL().clone());
 		labelTable.put(p.getDest(),p.getSource(),upstreamIn,upPair);
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: PSI" +
@@ -498,24 +603,83 @@ public class PscLscLSR extends LSR {
 	}
 	
 	/**
-	 * Print a confirmation message that a RESV message was sent.
-	 * @param resv the RESV message itself
-	 */
-	private void sentRESV(RESVMsg resv) {
-		traceMsg("Sent RESV message " + resv.getId() + " from:" + resv.getSource() +
-				"to:"+ resv.getSource() + " DL:" + resv.getDL());
-	}
-	
-	/**
 	 * Will either store or forward a data packet received on the data plane.
 	 * @param p the data packet
 	 * @param nic the LSRNIC this packet was received on.
 	 */
 	public void processDataPacket(Packet p,LSRNIC nic){
-		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
-				" to:" + p.getDest());
-		//TODO implement a check to see if the LSP has been set up yet
-		//TODO fill in the details of how to store/forward messages
+		
+		if(p.getOpticalLabel() != OpticalLabel.NA){ //did the data packet some from LSC?
+			processDataFromLSC(p,nic);
+		}
+		else{ //the packet came from PSC
+			processDataFromPSC(p,nic);
+		}
 	}
 	
+	private void processDataFromLSC(Packet p,LSRNIC nic){
+		Label pLabel;
+		NICLabelPair outPair;
+		LSRNIC outNIC;
+		MPLS header;
+		pLabel = new Label(p.getOpticalLabel());
+		
+		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
+			" to:" + p.getDest() + " on " + pLabel + " channel.");
+		
+		/*Is the data packet an RSVP message?*/
+		if(p.isRSVP()){
+			if(p.getType().compareTo("PATH") == 0){
+				processPSCPATHFromLSC((PATHMsg)p,nic);
+			}
+			if(p.getType().equals("RESV")){
+				processPSCRESVFromLSC((RESVMsg)p,nic);
+			}
+		}
+		else{
+			outPair = labelTable.getPSCOutPairWithLabel(p.popMPLSheader().getLabel());
+			outNIC = outPair.getNIC();
+			header = new MPLS(outPair.getLabel());
+			p.addMPLSheader(header);
+			outNIC.sendPacket(p, this);
+			sentData(p,outPair.getLabel());
+		}
+		
+	}
+	
+	private void processDataFromPSC(Packet p,LSRNIC nic){
+		NICLabelPair outPair;
+		LSRNIC outNIC;
+		MPLS header = p.popMPLSheader();
+		Label inLabel = header.getLabel();
+		Packet opticalPacket;
+		
+		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() +
+				" to:" + p.getDest() + " label:" + inLabel);
+		/*terminate the data packet if this is the destination*/
+		if(p.getDest() == this.address){
+			traceMsg("Terminated DATA packet " + p.getId());
+		}
+		/*forward it otherwise*/
+		else{
+			outPair = labelTable.getOpticalOutPair(inLabel);
+			outNIC = outPair.getNIC();
+			opticalPacket = new Packet(p.getSource(),p.getDest(),
+					outPair.getLabel().getOptVal());
+			opticalPacket.setId(p.getId());
+			opticalPacket.addMPLSheader(header);
+			outNIC.sendPacket(opticalPacket, this);
+			sentData(opticalPacket,outPair.getLabel());
+		}
+	}
+	
+	/**
+	 * Print a confirmation message that a data packet was sent from this router.
+	 * @param p
+	 * @param label
+	 */
+	private void sentData(Packet p,Label label){
+		 traceMsg("Sent DATA packet " + p.getId() + " from:" + p.getSource() + " to:" +
+				 p.getDest() + " label:" + label);
+	}
 }

@@ -201,7 +201,7 @@ public class TestNet1 {
 	@Test
 	public void testPATHInit(){
 		lsrA.createPacket(7);
-		for(int i = 0;i<19;i++){
+		for(int i = 0;i<30;i++){
 			this.tock();
 		}
 	}

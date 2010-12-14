@@ -12,7 +12,7 @@ public class MPLS {
 	 * @param stackingbit 1 if last header. 0 otherwise
 	 * @since 1.0
 	 */
-	public MPLS(Label label, int trafficclass, int stackingbit){
+	public MPLS(Label label){
 		try{
 			this.label = label;
 			this.trafficclass = trafficclass;

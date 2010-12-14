@@ -96,7 +96,7 @@ public abstract class LSR{
 			/*send the new packet*/
 			forwardNIC = labelTable.getOutPair(newPacket.getDest()).getNIC();
 			outLabel = labelTable.getOutPair(newPacket.getDest()).getLabel();
-			header = new MPLS(outLabel,0,1);
+			header = new MPLS(outLabel);
 			newPacket.addMPLSheader(header);
 			forwardNIC.sendPacket(newPacket, this);
 			//sentData(newPacket);
@@ -148,12 +148,39 @@ public abstract class LSR{
 	}
 	
 	/**
-	 * Print a notification 
+	 * Print a notification that a PATH message has been sent by a router
 	 * @param pathMsg
 	 */
 	protected void sentPATH(PATHMsg pathMsg) {
-		traceMsg("Sent PATH message " + pathMsg.getId() + " to " 
-				+ pathMsg.getDest());
+		if(pathMsg.getSL() != null){
+			traceMsg("Sent PATH message " + pathMsg.getId() + " to " 
+					+ pathMsg.getDest() + " UL:" + pathMsg.getUL() + " SL:" + pathMsg.getSL());
+		}
+		else{
+			traceMsg("Sent PATH message " + pathMsg.getId() + " to " 
+					+ pathMsg.getDest() + " UL:" + pathMsg.getUL());
+		}
+	}
+	
+	
+	/**
+	 * Print a notification that a RESV message has been transmitted by a router
+	 * @param resvMsg
+	 */
+	protected void sentRESV(RESVMsg resvMsg) {
+		if(resvMsg.getDL() != null){
+			traceMsg("Sent RESV message " + resvMsg.getId() + " to " 
+					+ resvMsg.getDest() + " DL:" + resvMsg.getDL());
+		}
+	}
+	
+	/**
+	 * Print a notification that a DATA packet has been transmitted by a router
+	 * @param resvMsg
+	 */
+	protected void sentDATA(Packet p){
+		traceMsg("Sent DATA Packet " + p.getId() + "from:" + p.getSource() +
+				" to:" + p.getDest());
 	}
 	
 	/**
