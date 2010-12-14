@@ -12,6 +12,8 @@ public class Label {
 	private boolean isOpticalLabel;
 	private boolean lspPending; //is this label pending on the receipt of a RESV msg.?
 	
+	public final static int RESV_PENDING = -1;
+	
 	/**
 	 * Use this constructor if you would like to create a new Optical label 
 	 * @param label

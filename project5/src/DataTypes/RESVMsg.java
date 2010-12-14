@@ -24,6 +24,31 @@ public class RESVMsg extends rsvpPacket {
 	}
 	
 	/**
+	 * Allocate space for a new PSC RESV message
+	 * @param source the address of the receiver of the traffic (the node which created this message)
+	 * @param dest the address of the traffic sender
+	 * @param dl the downstream label to be confirmed
+	 */
+	public RESVMsg(int source, int dest,Label dl){
+		super(source,dest);
+		this.type = "RESV";
+		this.dl = dl;
+	}
+	
+	/**
+	 * Creates a new RESV message with identical fields to a given RESV message but capable of
+	 * being transported across the optical network
+	 * @param m the message to be encapsulated in an wrapper
+	 * @param ol the optical label to be used.
+	 */
+	public RESVMsg(RESVMsg m,OpticalLabel ol){
+		super(m.source,m.dest,ol);
+		this.type = "RESV";
+		this.dl = m.getDL();
+		this.setId(m.getId());
+	}
+	
+	/**
 	 * Return the next hop on the list of hops to get back to sender.
 	 * Simulates the routers keeping state about the PATH message.
 	 */

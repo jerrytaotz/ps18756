@@ -71,14 +71,73 @@ public class PscLSR extends LSR {
 	 * This method will determine what type of RSVP message has been received and forward it
 	 * to the appropriate handler.
 	 * @param p the packet which was received
-	 * @param n the nic on which the packet was received.
+	 * @param nic the nic on which the packet was received.
 	 */
-	private void processRSVP(rsvpPacket p, LSRNIC n){
-		if(p.getRSVPMsg().compareTo("PATH") == 0){
-			receivedPATH((PATHMsg)p);
+	private void processRSVP(rsvpPacket p, LSRNIC nic){
+		if(p.getType().equals("PATH")){
+			processPATH((PATHMsg)p,nic);
+		}
+		if(p.getType().equals("RESV")){
+			processRESV((RESVMsg)p,nic);
 		}
 	}
 	
+	/**
+	 * Process a RESV message.  Confirms the downstream label contained in the RESV message 
+	 * and enters the appropriate entries into the labelTable.
+	 * @param p the RESV message
+	 * @param nic the nic 'p' was received on
+	 */
+	private void processRESV(RESVMsg p, LSRNIC nic) {
+		RESVMsg resvMsg;
+		Label upInLabel = labelTable.getInLabel(p.getSource(), p.getDest());
+		NICLabelPair upOutPair;
+		LSRNIC pscForwardNIC;
+		Label downInLabel = new Label(calcInLabel());
+		
+		traceMsg("Received PSC RESV message " + p.getId() + " from:" + p.getSource() + 
+				" to:" + p.getDest() + " DL:" + p.getDL());
+		
+		/*confirm the downstream label*/
+		labelTable.getPSCOutPairWithDest(p.getSource()).setLabel(p.getDL());
+
+		if(p.getDest() == this.address){
+			traceMsg("Terminated RESV Msg " + p.getId() + " releasing packets destined for " +
+					p.getSource());
+			releaseWaitingPackets(p);		
+		}
+		else{
+			/*create a PSC RESV message and forward it*/
+			upOutPair = labelTable.getPSCOutPairWithDest(p.getDest());
+			pscForwardNIC = upOutPair.getNIC();
+			resvMsg = new RESVMsg(p.getSource(),p.getDest(),downInLabel);
+			resvMsg.setId(p.getId());
+			pscForwardNIC.sendPacket(resvMsg, this);
+			sentRESV(resvMsg);
+		}
+		
+	}
+
+	/**
+	 * Releases all packets waiting on a specific LSP to be setup.  
+	 * NOTE: does not release ALL packets from the queue, just the ones waiting for the
+	 * LSP being setup by the RESV message p
+	 * @param p the RESV message which triggered the release
+	 */
+	private void releaseWaitingPackets(RESVMsg p) {
+		NICLabelPair outPair =  labelTable.getOutPair(p.getSource());
+		LSRNIC outNIC = outPair.getNIC();
+		MPLS header = new MPLS(outPair.getLabel());
+		
+		for(Packet waiting:waitingPackets){
+			if(waiting.getDest() == p.getSource()){
+				waiting.addMPLSheader(header);
+				outNIC.sendPacket(waiting, this);
+				sentData(p,outPair.getLabel());
+			}
+		}
+	}
+
 	/**
 	 * This method will determine the type of packet received and forward it to the appropriate
 	 * handler method.
@@ -98,8 +157,47 @@ public class PscLSR extends LSR {
 	 * This message should be printed whenever a PATH message is received.
 	 * @param p
 	 */
-	private void receivedPATH(PATHMsg p){
-		traceMsg("Received PATH message " + p.getId());
+	private void processPATH(PATHMsg p,LSRNIC nic){
+		Label upOutLabel = p.getUL();
+		Label upInLabel = new Label(calcInLabel());
+		Label downInLabel = new Label(calcInLabel());
+		Label downOutLabel;
+		LSRNIC forwardNIC;
+		NICLabelPair downOutPair;
+		NICLabelPair upOutPair = new NICLabelPair(nic,upOutLabel);
+		PATHMsg pathMsg;
+		RESVMsg resvMsg;
+		
+		if(p.getDest() == this.address){
+			traceMsg("Terminated PSC PATH message " + p.getId() + " from:" + p.getSource() + 
+					" to:" + p.getDest() + " UL: " + p.getUL());
+			/*add a null entry to signify that this is the destination node.*/
+			downOutPair = null; 
+			labelTable.put(p.getDest(), p.getSource(), upInLabel, upOutPair); //upstream
+			labelTable.put(p.getSource(), p.getDest(), downInLabel, downOutPair); //downstream
+			
+			/*Generate and forward new RESV message.*/
+			resvMsg = new RESVMsg(this.address,p.getSource(),downInLabel);
+			upOutPair.getNIC().sendPacket(resvMsg, this);
+			sentRESV(resvMsg);
+		}
+		else{
+			traceMsg("Received PSC PATH message " + p.getId() + " from:" + p.getSource() + 
+					" to:" + p.getDest() + " UL: " + p.getUL());
+			/*add upstream + downstream entries*/
+			downOutLabel = new Label(Label.RESV_PENDING);
+			downOutLabel.setIsPending(true);
+			forwardNIC = routingTable.get(p.getDest());
+			downOutPair = new NICLabelPair(forwardNIC,downOutLabel);
+			labelTable.put(p.getDest(), p.getSource(), upInLabel, upOutPair); //upstream
+			labelTable.put(p.getSource(), p.getDest(), downInLabel, downOutPair); //downstream
+			
+			/*Forward new PATH message.*/
+			pathMsg = new PATHMsg(p.getSource(),p.getDest(),upInLabel);
+			pathMsg.setId(p.getId());
+			forwardNIC.sendPacket(pathMsg, this);
+			sentPATH(pathMsg);
+		}
 	}
 	
 	/**
@@ -167,7 +265,7 @@ public class PscLSR extends LSR {
 		/*Add the new upstream Label Table Entry*/
 		upstreamLabel = new Label(calcInLabel());
 		upstreamPair = new NICLabelPair(null,null); //null signifies this node is the initiator.
-		labelTable.put(this.address,newPacket.getDest(),upstreamLabel, upstreamPair);
+		labelTable.put(newPacket.getDest(),this.address,upstreamLabel, upstreamPair);
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + upstreamLabel +
 				"\\local\\local");
 		
@@ -175,16 +273,15 @@ public class PscLSR extends LSR {
 		/*Add the new downstream Label Table entry.  The labels are not confirmed yet*/
 		downStreamInLabel = new Label(calcInLabel());
 		downStreamInLabel.setIsPending(true);
-		downStreamOutLabel = new Label(calcOutLabel(forwardNIC));
+		downStreamOutLabel = new Label(Label.RESV_PENDING);
 		downStreamOutLabel.setIsPending(true);
 		downStreamPair = new NICLabelPair(forwardNIC,downStreamOutLabel);
 		labelTable.put(this.address, newPacket.getDest(), downStreamInLabel, downStreamPair);		
 		System.out.println("LSR " + this.address + ", ROUTE ADD, Input: " + downStreamInLabel +
-				"\\" + dest + "\\" + downStreamOutLabel);
+				"\\" + dest + "\\RESV Pending");
 		
 		//Place a new PATH message in the output buffer
-		pathMsg = new PATHMsg(this.address, dest, upstreamLabel.clone(),
-				downStreamOutLabel.clone());
+		pathMsg = new PATHMsg(this.address, dest, upstreamLabel.clone());
 		sentPATH(pathMsg);
 		pathMsg.addPrevHop(this.address);
 		forwardNIC.sendPacket(pathMsg,this);
@@ -200,10 +297,33 @@ public class PscLSR extends LSR {
 	 * @param nic the LSRNIC this packet was received on.
 	 */
 	public void processDataPacket(Packet p,LSRNIC nic){
+		NICLabelPair outPair;
+		LSRNIC outNIC;
+		MPLS header;
+		
 		traceMsg("Received DATA packet " + p.getId() + " from:" + p.getSource() + 
 				" to:" + p.getDest());
-		//TODO implement a check to see if the LSP has been set up yet
-		//TODO fill in the details of how to store/forward messages
+		
+		if(p.getDest() != this.address){
+			 outPair = labelTable.getOutPair(p.popMPLSheader().getLabel().getIntVal());
+			 outNIC = outPair.getNIC();
+			 header = new MPLS(outPair.getLabel());
+			 p.addMPLSheader(header);
+			 outNIC.sendPacket(p, this);
+			 sentData(p,outPair.getLabel());
+		}
+		else{
+			traceMsg("Terminated DATA packet " + p.getId());
+		}
 	}
 	
+	/**
+	 * Print a confirmation message that a data packet was sent from this router.
+	 * @param p
+	 * @param label
+	 */
+	private void sentData(Packet p,Label label){
+		 traceMsg("Sent DATA packet " + p.getId() + " from:" + p.getSource() + " to:" +
+				 p.getDest() + " label:" + label);
+	}
 }
